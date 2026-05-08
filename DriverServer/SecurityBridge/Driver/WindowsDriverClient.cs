@@ -118,7 +118,8 @@ public class WindowsDriverClient : IDriverClient
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct DRIVER_EVENT_BUFFER
     {
-        public uint EventType;          // ULONG — 0=创建事件, 1=退出事件（必须是结构体第一个字段，与 Common.h 对齐）
+        // NOTE: EventType 字段已从此处移除，与当前编译的 .sys 驱动保持字节对齐。
+        // 若驱动更新后在首位加入 EventType，请重新加回此字段并开启下方退出事件处理逻辑。
         public uint Pid;                // ULONG — 新进程 PID
         public uint ParentPid;          // ULONG — 父进程 PID
 
@@ -211,18 +212,8 @@ public class WindowsDriverClient : IDriverClient
             // 将非托管内存中的结构体拷贝到托管对象
             var buf = Marshal.PtrToStructure<DRIVER_EVENT_BUFFER>(pBuffer);
 
-            // ── 进程退出事件：提前返回轻量对象，无需后续签名/规则判定 ──────────
-            // EventType == 1 对应 Common.h 中 EVENT_TYPE_EXIT
-            if (buf.EventType == 1)
-            {
-                return Task.FromResult<ProcessEvent?>(new ProcessEvent
-                {
-                    Id        = Guid.NewGuid().ToString(),
-                    EventType = "exit",
-                    Pid       = (int)buf.Pid,
-                    Timestamp = FileTimeToUnixMs(buf.Timestamp),
-                });
-            }
+            // NOTE: 当前驱动版本不含 EventType 字段，所有事件均视为进程创建事件。
+            // 若后续驱动升级并在 Common.h 首位加入 EventType，请恢复退出事件提前返回逻辑。
 
             // ── 中间层补充签名验证 ────────────────────────────────────────────
             // 驱动层 IsSigned 恒为 SIGN_UNKNOWN(0)，由中间层通过 WinVerifyTrust 补充

@@ -1,332 +1,273 @@
+<!-- Language switch -->
+<div align="right">
+  <a href="README_CN.md">中文</a> | <strong>English</strong>
+</div>
+
+<br/>
+
 <div align="center">
 
 ```
- ██╗     ██╗     ███╗   ███╗    ██╗  ██╗██╗██████╗ ███████╗
- ██║     ██║     ████╗ ████║    ██║  ██║██║██╔══██╗██╔════╝
- ██║     ██║     ██╔████╔██║    ███████║██║██████╔╝███████╗
- ██║     ██║     ██║╚██╔╝██║    ██╔══██║██║██╔═══╝ ╚════██║
- ███████╗███████╗██║ ╚═╝ ██║    ██║  ██║██║██║     ███████║
- ╚══════╝╚══════╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚═╝╚═╝     ╚══════╝
+██╗     ██╗     ███╗   ███╗    ██╗  ██╗██╗██████╗ ███████╗
+██║     ██║     ████╗ ████║    ██║  ██║██║██╔══██╗██╔════╝
+██║     ██║     ██╔████╔██║    ███████║██║██████╔╝███████╗
+██║     ██║     ██║╚██╔╝██║    ██╔══██║██║██╔═══╝ ╚════██║
+███████╗███████╗██║ ╚═╝ ██║    ██║  ██║██║██║     ███████║
+╚══════╝╚══════╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚═╝╚═╝     ╚══════╝
 ```
 
-**基于轻量化 LLM 的危险进程识别与分析拦截系统**
+**LLM-powered Host Intrusion Prevention System**
 
-*Windows Kernel-Level HIPS · LLM Threat Analysis · Real-time Process Tree*
+*A small idea that got a little out of hand — your critique is genuinely welcome.*
 
-<img src="https://img.shields.io/github/stars/blackstreetlight/LLMHips?style=flat&logo=github&color=00d4ff" alt="stars"/>
-<img src="https://img.shields.io/github/forks/blackstreetlight/LLMHips?style=flat&logo=github&color=00d4ff" alt="forks"/>
-<img src="https://img.shields.io/badge/Platform-Windows%2010%2F11-blue?style=flat&logo=windows" alt="platform"/>
-<img src="https://img.shields.io/badge/Driver-Ring%200%20%7C%20WDM-red?style=flat" alt="driver"/>
-<img src="https://img.shields.io/badge/LLM-Qwen2.5--7B-orange?style=flat" alt="llm"/>
-<img src="https://img.shields.io/badge/Frontend-React%2019-61dafb?style=flat&logo=react" alt="react"/>
-<img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="license"/>
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-8.0-purple?logo=dotnet)](https://dotnet.microsoft.com/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://reactjs.org/)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python)](https://python.org)
+[![LLM](https://img.shields.io/badge/LLM-Qwen2.5--7B-orange)](https://huggingface.co/Qwen)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20Kernel-0078D4?logo=windows)](https://learn.microsoft.com/en-us/windows-hardware/drivers/)
+[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen)](https://github.com/blackstreetlight/LLMHips/releases)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-ff69b4)](https://github.com/blackstreetlight/LLMHips/pulls)
 
 </div>
 
 ---
 
-## 🎯 项目介绍
+## 🧠 The Idea Behind This
 
-LLMHips 是一个完整的 **Windows 主机入侵防御系统（HIPS）**，将传统内核级进程拦截与大语言模型智能研判相结合，构建了一套"内核感知 → 规则预判 → LLM 深度分析 → 人工决策"的四级威胁响应链路。
+Traditional HIPS relies on static rule engines — they either block too aggressively or miss novel attack patterns entirely. The question I kept asking was:
 
-系统通过 Windows 内核驱动实时捕获每一个进程创建事件，经由 C# 桥接层完成签名验证与规则引擎评分后，将威胁信息推送至 React 前端控制台。对于高风险进程，用户可一键触发 LLM 进行 ATT&CK 框架下的多维度分析，并最终下发内核级阻断指令（`ZwTerminateProcess`）。
+> *What if the decision layer could reason about process behavior in natural language, not just match signatures?*
 
-```
-用户操作 ──► React 控制台 ──► WebSocket ──► C# 桥接层 ──► IOCTL ──► 内核驱动
-                ▲                                                      │
-                └──────────── 进程事件 / 退出通知 / 心跳 ◄─────────────┘
+This project is my attempt at an answer. It wires a **Windows kernel minifilter driver** to a **C# WebSocket bridge** to a **React security console** — and plugs a locally-running LLM into that chain for contextual analysis and human-readable explanations.
 
-                        ↕ SSE 流式推理
-                   LLM 推理服务（Qwen2.5-7B）
-```
+It started as a graduation thesis. It grew into something I genuinely find interesting. I'm sharing it publicly because I believe the architecture has potential, and I'd like experienced engineers — especially those in kernel security, threat detection, or LLM agent systems — to poke holes in it and help me understand what I'm missing.
+
+**I am a student. If something here is naive or wrong, please open an issue and explain why. That's worth more to me than a star.**
 
 ---
 
-## ✨ 核心功能
+## 📸 Screenshots
 
 <table>
-<tr>
-<td width="50%">
-
-**🛡️ 内核级进程拦截**
-- `PsSetCreateProcessNotifyRoutineEx` 进程回调
-- 采集 PID、路径、命令行、父进程、签名、文件创建时间
-- SPSC 无锁 Ring Buffer（DISPATCH_LEVEL 安全）
-- 支持 `ZwTerminateProcess` 内核强制终止
-
-</td>
-<td width="50%">
-
-**🤖 LLM 智能研判**
-- Qwen2.5-7B-Instruct 本地推理，无需联网
-- 五维分析框架：进程溯源 / 签名 / 命令行 / 父子链 / 路径
-- ATT&CK 战术编号映射与结构化输出
-- SSE 流式渲染，支持多轮追问
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-**📊 实时可视化**
-- 进程树：React Flow + Dagre 自动布局
-- 高危攻击链连线动画，一眼识别横向移动
-- ECharts 实时风险统计图表
-- 进程退出实时感知（内核 → 前端全链路）
-
-</td>
-<td width="50%">
-
-**⚙️ 完整管控能力**
-- 白名单：进程名精确匹配 + 路径前缀匹配
-- 研判工单：完整对话记录与处置历史
-- 阻断历史：时间轴展示，保留完整现场信息
-- 指数退避 WebSocket 自动重连
-
-</td>
-</tr>
+  <tr>
+    <td align="center"><b>Security Dashboard</b></td>
+    <td align="center"><b>Process Monitor</b></td>
+  </tr>
+  <tr>
+    <td><img src="Picture/截屏2026-05-08 18.31.27.png" alt="Security Dashboard" width="480"/></td>
+    <td><img src="Picture/截屏2026-05-08 18.32.18.png" alt="Process Monitor" width="480"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Real-time Process Tree</b></td>
+    <td align="center"><b>Kernel Intercept History</b></td>
+  </tr>
+  <tr>
+    <td><img src="Picture/截屏2026-05-08 18.32.53.png" alt="Process Tree" width="480"/></td>
+    <td><img src="Picture/截屏2026-05-08 18.33.19.png" alt="Intercept History" width="480"/></td>
+  </tr>
 </table>
 
+> 📹 A demo video is available locally at `Picture/演示视频.mov` (not uploaded — exceeds GitHub's 100 MB file limit).
+
 ---
 
-## 🏗️ 系统架构
-
-### 四层架构总览
+## 🏗️ Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                     React 前端控制台（TSX）                        │
-│                                                                    │
-│  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌─────────┐ ┌──────────┐  │
-│  │实时监控  │ │ 进程树  │ │LLM研判   │ │阻断历史 │ │白名单管理│  │
-│  │Dashboard│ │ReactFlow│ │SSE流式   │ │时间轴   │ │JSON持久化│  │
-│  └─────────┘ └─────────┘ └──────────┘ └─────────┘ └──────────┘  │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │ WebSocket (ws://host:9527)
-┌────────────────────────▼─────────────────────────────────────────┐
-│                  C# 桥接层（SecurityBridge）                       │
-│                                                                    │
-│  DeviceIoControl ──► WinVerifyTrust签名验证 ──► L2规则引擎评分    │
-│                                                                    │
-│  process_event / process_exit / heartbeat / command_ack           │
-│  ◄──────────────────────────────────────────── driver_command     │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │ IOCTL (0x80002000 GET / 0x80002004 SET)
-┌────────────────────────▼─────────────────────────────────────────┐
-│                 Ring 0 内核驱动（ZDriverHips）                     │
-│                                                                    │
-│  PsSetCreateProcessNotifyRoutineEx                                 │
-│  ──► 进程信息采集 ──► SPSC Ring Buffer ──► KEVENT 通知            │
-│                                                                    │
-│  IOCTL_SEND_COMMAND ──► ZwTerminateProcess（内核强制终止）         │
-└──────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────────┐
-│                   LLM 推理服务（独立进程）                         │
-│                                                                    │
-│  FastAPI + SSE  ◄──► Qwen2.5-7B-Instruct（本地 GPU 推理）        │
-│  安全专用 System Prompt · ATT&CK 映射 · 结构化输出                │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### 进程拦截完整数据流
-
-```
-进程创建
-  │
-  ▼
-PsSetCreateProcessNotifyRoutineEx（内核回调，Ring 0）
-  │  采集：PID / PPID / 路径 / 命令行 / 父进程信息
-  ▼
-SPSC Ring Buffer（DISPATCH_LEVEL 无锁写入）
-  │
-  ▼
-IOCTL_GET_EVENT（C# 桥接层 500ms 轮询读取）
-  │
-  ├─► WinVerifyTrust 签名验证（用户态，补充内核层无法完成的验签）
-  │
-  ├─► L2 规则引擎评分
-  │     ├── 危险工具名（mimikatz / frpc / cobalt_strike...）
-  │     ├── 高危命令行（-enc / bypass / downloadstring...）
-  │     ├── 未签名 + 可疑路径（%APPDATA% / %TEMP%...）
-  │     ├── 受信任系统路径（System32 / Program Files → LOW）
-  │     └── 受信任父进程（explorer / svchost → LOW）
-  │
-  ▼
-WebSocket 广播（process_event）
-  │
-  ▼
-React 前端实时展示
-  │
-  ├─► [用户触发] LLM 深度研判（SSE 流式推理）
-  │
-  └─► [用户决策] 内核阻断
-        │  WebSocket driver_command { action: "kill", pid }
-        ▼
-      C# → IOCTL_SEND_COMMAND → ZwTerminateProcess
+┌────────────────────────────────────────────────────────────┐
+│                  Windows Kernel  (Ring 0)                  │
+│                                                            │
+│  PsSetCreateProcessNotifyRoutineEx                         │
+│            │                                               │
+│            ▼                                               │
+│    ZDriverHips.sys ──── rule pre-filter ──► ZwTerminateProcess
+│            │             (synchronous, <1ms)               │
+│            │   IOCTL ring buffer (circular, drop-on-full)  │
+└────────────┼───────────────────────────────────────────────┘
+             │  DeviceIoControl  (METHOD_BUFFERED)
+             ▼
+┌────────────────────────────────────────────────────────────┐
+│          SecurityBridge  (C# / .NET 8,  Ring 3)            │
+│                                                            │
+│  WindowsDriverClient                                       │
+│    └─ Marshal.PtrToStructure<DRIVER_EVENT_BUFFER>          │
+│         (byte-exact struct alignment, LayoutKind.Sequential)
+│                                                            │
+│  WinVerifyTrust (P/Invoke) ── Authenticode re-verify       │
+│  ReEvaluateRiskLevel ──────── rule mirror (post-sign)      │
+│                                                            │
+│  WebSocketHandler ─────────── JSON push → frontend         │
+└────────────┼───────────────────────────────────────────────┘
+             │  ws://host:9527/ws
+             ▼
+┌────────────────────────────────────────────────────────────┐
+│        React Security Console  (Vite + TypeScript)         │
+│                                                            │
+│  Zustand store ──── event stream                           │
+│  MonitorPanel ─────────────── real-time event list         │
+│  ProcessTreeView ──────────── React Flow + Dagre DAG       │
+│  InterceptHistory ─────────── blocked event audit log      │
+│  ProcessDetailView ── LLM query ──► vllm HTTP endpoint     │
+│                                         │                  │
+│                                         ▼                  │
+│                               Qwen2.5-7B-Instruct          │
+│                               (local, Python / vllm)       │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📁 目录结构
+## 🔧 Real Engineering Challenges
+
+*(Not "highlights" — these are the places where things actually broke and taught me something. If you've solved them better, I want to know.)*
+
+### 1. Cross-Privilege Struct Alignment: The 4-Byte Trap
+
+The C# `DRIVER_EVENT_BUFFER` struct must be **byte-for-byte identical** to the kernel struct in `Common.h`, enforced via `[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]`. During development, a single misplaced `uint EventType` field (4 bytes) caused `ProcessName` to read 2 Unicode characters into the actual buffer — appearing as garbled output in logs. The compiled `.sys` and the C# struct had drifted to different revisions of the header.
+
+This is a quiet failure mode: the data reads back without error, it's just wrong. Worth knowing if you ever do cross-privilege P/Invoke with variable-length Unicode strings.
+
+### 2. The LLM Must Not Touch the Enforcement Path
+
+The blocking decision — whether to call `ZwTerminateProcess` — must be made synchronously, inside the `PsSetCreateProcessNotifyRoutineEx` callback, with a latency budget in single-digit milliseconds. The LLM has no place here.
+
+The current design keeps the LLM entirely on the **analysis path**: the frontend fires an async HTTP request to the vllm server only after the event has already been blocked or allowed. The kernel-to-bridge-to-frontend pipeline is unaffected by inference latency. I think this is the right split, but I'm curious whether anyone has seen architectures where the LLM is given real veto power without introducing unacceptable latency.
+
+### 3. Signature Verification Requires a Two-Layer Design
+
+`WinVerifyTrust` is a user-mode API. The kernel minifilter cannot call it. This means the driver reports `SIGN_UNKNOWN` for every process, and the bridge re-runs Authenticode verification via P/Invoke after receiving the event.
+
+The practical consequence: the rule *"unsigned binary launched from a user-writable path → HIGH risk"* can only fire correctly in the bridge, not the kernel. Without this second layer, that rule is dead code and unsigned malware in `%APPDATA%` would always be classified as `MEDIUM`.
+
+### 4. Maintaining a Live DAG under a Stream of Events
+
+The process tree (React Flow + Dagre) receives events as a stream, not a snapshot. Each `process_create` event references a `parentPid` that may or may not already exist in the tree. Process exit events should dim — not remove — nodes.
+
+The main subtleties: PID reuse (a new process can claim a PID whose node is still in the "terminated" state), orphan processes (parent PID was never observed because monitoring started mid-session), and layout thrash (Dagre re-runs on every event, which at high event rates becomes the dominant render cost).
+
+### 5. IOCTL Ring Buffer: Drop vs. Block
+
+The driver maintains a fixed-size circular event buffer. If the userspace consumer (`DeviceIoControl` polling) is slow — for example, because a build toolchain is spawning hundreds of processes per second — the buffer fills and new events are dropped. This is a deliberate policy choice: the kernel callback must return quickly, and starving it of buffer space is preferable to blocking it.
+
+I'm not confident this is the best approach. An ETW (Event Tracing for Windows) session might be a cleaner architecture, with better OS-level buffering and less risk of data corruption under concurrent access. If you have experience with ETW-based kernel event pipelines, I'd genuinely like to understand the tradeoffs.
+
+---
+
+## 📁 Repository Structure
 
 ```
 LLMHips/
-│
-├── DriverLayer/
-│   ├── ZDriverHips/                  # 核心内核驱动（C）
-│   │   ├── DriverEntry.c/h           # 驱动入口，设备对象创建
-│   │   ├── ProcessCallback.c/h       # 进程创建/退出回调
-│   │   ├── EventQueue.c/h            # SPSC 无锁 Ring Buffer
-│   │   ├── IoctlHandler.c/h          # IOCTL 分发路由
-│   │   ├── ProcessInfo.c/h           # 进程信息采集
-│   │   ├── RuleEngine.c/h            # L2 规则引擎
-│   │   └── Common.h                  # 驱动/桥接层共享结构体定义
-│   └── ProcessHips/                  # 参考驱动实现（原型）
-│
-├── DriverServer/
-│   └── SecurityBridge/               # C# 桥接服务
-│       ├── Driver/
-│       │   ├── IDriverClient.cs      # 驱动通信抽象接口
-│       │   ├── WindowsDriverClient.cs # 真实 IOCTL 实现（Windows only）
-│       │   └── MockDriverClient.cs   # Mock 驱动（跨平台开发用）
-│       ├── WebSocket/
-│       │   ├── WebSocketHandler.cs   # 消息路由与指令处理
-│       │   └── WebSocketConnectionManager.cs
-│       ├── Models/                   # 数据结构定义
-│       ├── Worker.cs                 # 轮询主循环 + 心跳广播
-│       └── Program.cs                # 依赖注入 + 服务配置
-│
-├── LLM/
-│   └── QwenLLM/
-│       ├── Web/server.py             # FastAPI + SSE 推理接口
-│       └── Web/requirements.txt
-│
-├── security-console/
-│   └── security-console/             # React 19 前端
-│       ├── src/
-│       │   ├── features/
-│       │   │   ├── dashboard/        # 实时监控 + ECharts 图表
-│       │   │   ├── process-tree/     # React Flow 进程树可视化
-│       │   │   ├── llm/              # LLM 研判面板（SSE 流式）
-│       │   │   ├── monitor/          # 事件列表 + 白名单抽屉
-│       │   │   ├── process-detail/   # 进程详情全字段展示
-│       │   │   ├── llm-history/      # 研判工单历史
-│       │   │   └── block-history/    # 阻断历史时间轴
-│       │   ├── store/useSystemStore.ts  # Zustand 全局状态
-│       │   └── types/index.ts           # TypeScript 类型定义
-│       └── public/whitelist.json     # 白名单持久化文件
-│
-└── ProjectPlan/                      # 实现规划与差距分析文档
+├── DriverLayer/              # WDK kernel driver (C)
+│   └── ZDriverHips/          # Minifilter + rule engine + IOCTL interface
+├── DriverServer/             # C# bridge server (.NET 8)
+│   └── SecurityBridge/       # WebSocket handler, driver client, LLM proxy
+├── security-console/         # React frontend (Vite + TypeScript)
+│   └── security-console/
+│       ├── src/features/     # Dashboard, Monitor, ProcessTree, InterceptHistory
+│       └── src/store/        # Zustand global state
+├── LLM/                      # Python inference server
+│   └── QwenLLM/              # vllm + Qwen2.5-7B-Instruct
+└── Picture/                  # Screenshots & demo video
 ```
 
 ---
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 环境要求
+### Environment Requirements
 
-| 组件 | 环境要求 |
-|------|---------|
-| 内核驱动 | Windows 10/11 x64，启用测试签名模式 |
-| C# 桥接层 | .NET 8 SDK，Windows x64（Mock 模式可跨平台） |
-| 前端控制台 | Node.js 18+，任意平台 |
-| LLM 推理服务 | Python 3.10+，建议 GPU ≥ 16GB 显存 |
+| Component | Requirement |
+|-----------|------------|
+| Kernel Driver | Windows 10/11 x64, test-signing enabled |
+| C# Bridge | .NET 8 SDK |
+| Frontend | Node.js 18+, npm or pnpm |
+| LLM Server | Python 3.10+, CUDA GPU (≥16 GB VRAM recommended) |
 
-### 1. 启动 LLM 推理服务
+> **Mock mode**: The bridge ships with `"UseMockDriver": true` in `appsettings.json`. The full frontend + bridge stack runs on macOS and Linux with no kernel driver or GPU required — useful for frontend development and architecture exploration.
+
+### 1 — LLM Inference Server
 
 ```bash
 cd LLM/QwenLLM
-pip install -r Web/requirements.txt
-# 下载模型权重至 Qwen2.5-7B-Instruct/ 目录
-python Web/server.py
-# 默认监听 http://localhost:8000
+pip install -r requirements.txt
+python server.py          # Listens on http://localhost:8000
 ```
 
-### 2. 启动 C# 桥接层
+### 2 — C# Bridge
 
 ```bash
 cd DriverServer/SecurityBridge
-dotnet run
-# 默认监听 ws://localhost:9527/ws
+dotnet run                # WebSocket on ws://localhost:9527/ws
 ```
 
-> `appsettings.json` 中设置 `"UseMockDriver": true` 可在无驱动环境下运行，用随机数据模拟进程事件，便于前端开发调试。
-
-### 3. 启动前端控制台
+### 3 — React Console
 
 ```bash
 cd security-console/security-console
-cp .env.example .env.local
-# 编辑 .env.local，填入实际地址
-npm install
-npm run dev
-# 访问 http://localhost:5173
+cp .env.example .env.local   # set VITE_WS_URL and VITE_LLM_URL
+npm install && npm run dev   # http://localhost:5173
 ```
 
-**.env.local 示例：**
-```env
-VITE_WS_URL=ws://YOUR_HOST:9527/ws
-VITE_LLM_URL=http://localhost:8000
+### 4 — Windows Kernel Driver *(production only)*
+
 ```
-
-### 4. 加载内核驱动（Windows，需管理员权限）
-
-```powershell
-# 开启测试签名模式（重启生效）
-bcdedit /set testsigning on
-
-# 注册并启动驱动服务
-sc create ZDriverHips binPath= "C:\path\to\ZDriverHips.sys" type= kernel start= demand
-sc start ZDriverHips
-
-# 停止驱动
-sc stop ZDriverHips
+# Open DriverLayer/ZDriverHips/ZDriverHips.sln in Visual Studio
+# Build → x64 / Release
+# bcdedit /set testsigning on   (requires elevated prompt, reboot)
+# sc create ZDriverHips binPath= "C:\path\to\ZDriverHips.sys" type= kernel
+# sc start ZDriverHips
 ```
 
 ---
 
-## 🔬 技术实现亮点
+## 🗺️ v1.1 Roadmap
 
-### 跨特权级完整阻断链路
-```
-前端点击「内核阻断」
-  → WebSocket driver_command { action:"kill", pid }
-  → C# WebSocketHandler.HandleDriverCommandAsync()
-  → DeviceIoControl(IOCTL_SEND_COMMAND = 0x80002004)
-  → 驱动 IoctlHandler → ZwTerminateProcess
-```
-从用户界面的一次点击到内核强制终止进程，全链路打通。
+v1.0 establishes the end-to-end pipeline. Here's what's planned for v1.1:
 
-### IRQL 安全的无锁队列
-内核回调运行在 `PASSIVE_LEVEL` ~ `APC_LEVEL`，但中断随时可能将执行提升至 `DISPATCH_LEVEL`。EventQueue 使用 `InterlockedIncrement` 等原子操作实现 SPSC Ring Buffer，在不使用互斥锁的前提下保证线程安全，避免死锁风险。
-
-### 签名验证分层方案
-内核层在进程创建回调中无法安全调用 Authenticode 验签 API（IRQL 限制）。ZDriverHips 仅标记 `IsSigned = SIGN_UNKNOWN`，由 C# 桥接层在用户态通过 `WinVerifyTrust` 完成真实签名验证，再结合验签结果重新执行规则引擎评分，使「未签名 + 可疑路径 → HIGH」规则得以真正生效。
-
-### 进程退出实时感知
-`PsSetCreateProcessNotifyRoutineEx` 同时捕获进程退出事件（`CreateInfo == NULL`）。驱动将退出 PID 写入队列，经 WebSocket 广播 `process_exit` 消息，前端 Zustand store 收到后立即调用 `markTerminated(pid)`，实时监控面板隐藏已结束进程，进程详情页保留记录并打上「已结束」标签。
+| Feature | What & Why |
+|---------|-----------|
+| **RAG for threat context** | Index CVE records, MITRE ATT&CK techniques, and malware sandbox reports into a vector store. LLM retrieves relevant context before generating analysis, reducing hallucination on specific threat names and TTPs. |
+| **Domain-specific fine-tuning** | Fine-tune the base model on labeled process event datasets (open malware sandbox telemetry). Goal: more accurate risk classification than the current heuristic rule engine, especially for living-off-the-land binaries (LOLBins). |
+| **Multi-step Agent architecture** | Replace single-turn LLM calls with a ReAct-style agent loop: `observe → plan → act`. The agent will be able to call tools (VirusTotal lookup, parent chain traversal, network connection query) before committing to a recommendation. |
+| **Kernel detection surface expansion** | Add network socket monitoring (`FwpmFilterAdd`), registry write interception (`CmRegisterCallback`), and file write events (`FltRegisterFilter`). Current version monitors process creation only — a significant blind spot for fileless attacks. |
+| **Online / offline model switching** | UI toggle to route LLM queries to either the local vllm server (offline, private data stays local) or a cloud API endpoint (online, higher capability). Configuration-driven, no code change required. |
+| **Multi-LLM backend support** | Plugin-style LLM backend adapter so users can swap in Claude, Gemini, ChatGPT, DeepSeek, or any OpenAI-compatible endpoint without modifying bridge code. |
 
 ---
 
-## 🛠️ 技术栈
+## 🤝 Let's Build This Together
 
-| 层级 | 技术 |
-|------|------|
-| 内核驱动 | C · WDM · Windows Kernel API |
-| 桥接层 | C# · .NET 8 · ASP.NET Core · WebSocket |
-| 前端 | React 19 · TypeScript · Tailwind CSS · Zustand |
-| 可视化 | ECharts · React Flow · Dagre |
-| LLM | Python · FastAPI · Qwen2.5-7B-Instruct · SSE |
+I'm sharing this openly because I think the direction is interesting, and I know I'm not the right person to take it to its full potential alone.
+
+**If you work in kernel security, EDR/XDR, threat intelligence, or LLM agent systems:**
+
+There are real open questions in this project that I don't have good answers for. If you do, I'd love to hear them — even if the answer is "your approach is wrong because...". Especially if it's that.
+
+Questions I'm sitting with:
+- Is `PsSetCreateProcessNotifyRoutineEx` + `ZwTerminateProcess` the right interception point, or does the industry use a different mechanism for reliable pre-execution blocking?
+- How do production EDRs deal with the latency/accuracy tradeoff on the enforcement path? Is there a standard pattern I should be reading about?
+- IOCTL ring buffer vs. ETW vs. kernel streaming — what would you choose for this use case and why?
+- Is a 7B model running locally actually useful in this context, or is the rule engine doing all the real work and the LLM is just generating plausible-sounding explanations?
+
+**If you're a student or early-career engineer exploring security or systems:**
+
+The mock driver mode lets you run everything without any kernel setup or GPU. It's a reasonable starting point for understanding how a multi-layer security event pipeline is structured. Feel free to ask questions in Discussions — I'll answer what I can.
+
+**How to contribute:**
+- 🐛 Open an issue for bugs, wrong assumptions, or architectural critique
+- 💡 Open a discussion for questions or ideas
+- 🔀 Submit a PR with improvements — all sizes welcome
+- ⭐ A star helps visibility, but honest feedback helps more
 
 ---
 
-## ⚠️ 免责声明
+## ⚠️ Disclaimer
 
-本项目仅供学习与研究使用。内核驱动程序若使用不当可能导致系统蓝屏（BSOD），请在虚拟机或测试机上运行。请勿将本系统用于任何未授权的环境监控行为。
+This project interacts with the Windows kernel. **Test only in isolated virtual machines with snapshots.** Never deploy the driver to a production system. The authors accept no responsibility for system instability, data loss, or unintended process termination resulting from use of this software.
 
 ---
 
-## 📜 License
+## 📄 License
 
-[MIT License](./LICENSE) · © 2026 blackstreetlight
+[MIT](LICENSE) — use it freely, attribution appreciated.
