@@ -7,14 +7,14 @@
 
 <div align="center">
 
-```
+<pre>
 ██╗     ██╗     ███╗   ███╗    ██╗  ██╗██╗██████╗ ███████╗
 ██║     ██║     ████╗ ████║    ██║  ██║██║██╔══██╗██╔════╝
 ██║     ██║     ██╔████╔██║    ███████║██║██████╔╝███████╗
 ██║     ██║     ██║╚██╔╝██║    ██╔══██║██║██╔═══╝ ╚════██║
 ███████╗███████╗██║ ╚═╝ ██║    ██║  ██║██║██║     ███████║
 ╚══════╝╚══════╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚═╝╚═╝     ╚══════╝
-```
+</pre>
 
 **LLM-powered Host Intrusion Prevention System**
 
@@ -41,9 +41,9 @@ Traditional HIPS relies on static rule engines — they either block too aggress
 
 This project is my attempt at an answer. It wires a **Windows kernel minifilter driver** to a **C# WebSocket bridge** to a **React security console** — and plugs a locally-running LLM into that chain for contextual analysis and human-readable explanations.
 
-It started as a graduation thesis. It grew into something I genuinely find interesting. I'm sharing it publicly because I believe the architecture has potential, and I'd like experienced engineers — especially those in kernel security, threat detection, or LLM agent systems — to poke holes in it and help me understand what I'm missing.
+It started as a small personal project that turned into something I genuinely find interesting. I'm sharing it publicly because I believe the architecture has potential, and I'd like experienced engineers — especially those in kernel security, threat detection, or LLM agent systems — to poke holes in it and help me grow.
 
-**I am a student. If something here is naive or wrong, please open an issue and explain why. That's worth more to me than a star.**
+**I'm a newcomer just getting my footing in this field. If something here is naive or wrong, please open an issue and explain why. That kind of feedback is worth far more to me than a star.**
 
 ---
 
@@ -118,39 +118,80 @@ It started as a graduation thesis. It grew into something I genuinely find inter
 
 ---
 
-## 🔧 Real Engineering Challenges
+## 🔩 Module Design Overview
 
-*(Not "highlights" — these are the places where things actually broke and taught me something. If you've solved them better, I want to know.)*
+A brief walkthrough of each layer's design thinking — not a complete spec, just the key decisions worth knowing about.
 
-### 1. Cross-Privilege Struct Alignment: The 4-Byte Trap
+### Layer 1 — Kernel Driver (`ZDriverHips`)
 
-The C# `DRIVER_EVENT_BUFFER` struct must be **byte-for-byte identical** to the kernel struct in `Common.h`, enforced via `[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]`. During development, a single misplaced `uint EventType` field (4 bytes) caused `ProcessName` to read 2 Unicode characters into the actual buffer — appearing as garbled output in logs. The compiled `.sys` and the C# struct had drifted to different revisions of the header.
+The driver registers a `PsSetCreateProcessNotifyRoutineEx` callback to intercept every process creation system-wide. Inside the callback, a lightweight rule engine evaluates the process against a set of heuristics (dangerous tool names, suspicious command-line patterns, path-based risk signals) and either terminates the process immediately via `ZwTerminateProcess` or tags it for monitoring. The decision is synchronous and must complete in microseconds.
 
-This is a quiet failure mode: the data reads back without error, it's just wrong. Worth knowing if you ever do cross-privilege P/Invoke with variable-length Unicode strings.
+Events are written to a fixed-size IOCTL ring buffer. When the buffer is full, new events are dropped — by design. The kernel callback cannot be blocked waiting for userspace to consume events.
 
-### 2. The LLM Must Not Touch the Enforcement Path
+### Layer 2 — Bridge Server (`SecurityBridge`)
 
-The blocking decision — whether to call `ZwTerminateProcess` — must be made synchronously, inside the `PsSetCreateProcessNotifyRoutineEx` callback, with a latency budget in single-digit milliseconds. The LLM has no place here.
+The bridge polls the driver buffer via `DeviceIoControl` and unmarshals each event into a C# struct using `Marshal.PtrToStructure<T>`. The struct layout must be byte-exact with the kernel definition (`LayoutKind.Sequential`).
 
-The current design keeps the LLM entirely on the **analysis path**: the frontend fires an async HTTP request to the vllm server only after the event has already been blocked or allowed. The kernel-to-bridge-to-frontend pipeline is unaffected by inference latency. I think this is the right split, but I'm curious whether anyone has seen architectures where the LLM is given real veto power without introducing unacceptable latency.
+Because `WinVerifyTrust` (Authenticode signature verification) is a user-mode-only API, the driver reports `SIGN_UNKNOWN` for all processes. The bridge re-evaluates each event's signing status via P/Invoke, then re-runs the risk scoring with the actual signing result. This two-pass design is what makes the rule "unsigned binary in `%APPDATA%` → HIGH risk" actually work.
 
-### 3. Signature Verification Requires a Two-Layer Design
+Finalized events are serialized to JSON and pushed to connected clients over WebSocket (`System.Net.WebSockets`).
 
-`WinVerifyTrust` is a user-mode API. The kernel minifilter cannot call it. This means the driver reports `SIGN_UNKNOWN` for every process, and the bridge re-runs Authenticode verification via P/Invoke after receiving the event.
+### Layer 3 — React Console (`security-console`)
 
-The practical consequence: the rule *"unsigned binary launched from a user-writable path → HIGH risk"* can only fire correctly in the bridge, not the kernel. Without this second layer, that rule is dead code and unsigned malware in `%APPDATA%` would always be classified as `MEDIUM`.
+The frontend maintains a single Zustand store as the source of truth for the event stream. Four views read from this store:
 
-### 4. Maintaining a Live DAG under a Stream of Events
+- **Dashboard** — aggregate stats, risk distribution, and a rolling alert feed
+- **Process Monitor** — filterable live list of process events with inline action controls (allow / block / whitelist)
+- **Process Tree** — a React Flow + Dagre graph that builds a parent-child DAG from incoming events in real time. Exit events dim nodes rather than removing them, so the tree shows the history of process activity, not just what's alive.
+- **Intercept History** — an audit log of all kernel-blocked events with full metadata
 
-The process tree (React Flow + Dagre) receives events as a stream, not a snapshot. Each `process_create` event references a `parentPid` that may or may not already exist in the tree. Process exit events should dim — not remove — nodes.
+### Layer 4 — LLM Server (`QwenLLM`)
 
-The main subtleties: PID reuse (a new process can claim a PID whose node is still in the "terminated" state), orphan processes (parent PID was never observed because monitoring started mid-session), and layout thrash (Dagre re-runs on every event, which at high event rates becomes the dominant render cost).
+A vllm-served Qwen2.5-7B-Instruct instance exposes a simple HTTP endpoint. When the user opens the detail panel for a specific process event, the frontend constructs a prompt from the event metadata and fires an async request. The response is displayed as a plain-language analysis of the process.
 
-### 5. IOCTL Ring Buffer: Drop vs. Block
+The LLM runs **entirely off the enforcement path** — the kernel has already decided before any inference happens.
 
-The driver maintains a fixed-size circular event buffer. If the userspace consumer (`DeviceIoControl` polling) is slow — for example, because a build toolchain is spawning hundreds of processes per second — the buffer fills and new events are dropped. This is a deliberate policy choice: the kernel callback must return quickly, and starving it of buffer space is preferable to blocking it.
+---
 
-I'm not confident this is the best approach. An ETW (Event Tracing for Windows) session might be a cleaner architecture, with better OS-level buffering and less risk of data corruption under concurrent access. If you have experience with ETW-based kernel event pipelines, I'd genuinely like to understand the tradeoffs.
+## ⚠️ Known Limitations & Honest Shortcomings
+
+*This section exists because glossing over weaknesses in a README is pointless. Here's what doesn't work well yet.*
+
+### The LLM Isn't Actually Reasoning — It's Paraphrasing
+
+This is the most important caveat. Right now, the LLM receives a prompt that contains the process name, path, command line, risk level, parent process, and signing status — and generates a paragraph that largely re-describes that same information in natural language. It looks like analysis, but it's closer to structured summarization.
+
+There's no genuine reasoning happening because:
+- The model has no access to external threat intelligence (VirusTotal, MITRE ATT&CK, sandbox reports)
+- It has no memory of previous events — each query is stateless
+- It doesn't build behavioral profiles or detect sequences of low-risk events that together constitute an attack
+- It cannot take action — it can only describe
+
+The risk level it "explains" was already determined by the rule engine before the LLM was invoked. In the current architecture, removing the LLM would not change a single blocking decision. This is the core limitation the v1.1 Agent architecture and RAG integration are meant to address.
+
+### Kernel Detection Coverage Is Narrow
+
+The driver only monitors **process creation**. This means the following are completely invisible to the system:
+
+- Fileless attacks (shellcode injected into existing processes, no new process spawned)
+- DLL injection and process hollowing
+- Registry persistence (`HKLM\...\Run` writes)
+- Network connections initiated by already-running processes
+- File writes to sensitive paths
+
+A real EDR monitors all of these. This system currently covers one entry point.
+
+### No Behavioral Baseline or Sequence Analysis
+
+Each event is evaluated in isolation. The system cannot detect slow attacks where each individual action appears benign — for example, a legitimate-looking process that runs for 10 minutes before reaching out to a C2 server. Without temporal correlation across events, these patterns are invisible.
+
+### WebSocket Has No Authentication
+
+The bridge pushes all process events over an unauthenticated WebSocket endpoint. Anyone on the local network who discovers `ws://host:9527/ws` can receive the full event stream. This is fine for a local demo but would need proper auth (token-based or mTLS) before any real deployment.
+
+### LLM Hallucination Risk
+
+The model may confidently describe a process as malicious based on superficial name similarity, or miss a genuinely dangerous process it hasn't seen patterns of. The LLM output is advisory only and should never be used as the sole basis for a blocking decision. The rule engine is more trustworthy for enforcement; the LLM is better suited for helping a human analyst understand context quickly.
 
 ---
 
@@ -250,9 +291,9 @@ Questions I'm sitting with:
 - IOCTL ring buffer vs. ETW vs. kernel streaming — what would you choose for this use case and why?
 - Is a 7B model running locally actually useful in this context, or is the rule engine doing all the real work and the LLM is just generating plausible-sounding explanations?
 
-**If you're a student or early-career engineer exploring security or systems:**
+**If you're also early in your career and exploring security or systems:**
 
-The mock driver mode lets you run everything without any kernel setup or GPU. It's a reasonable starting point for understanding how a multi-layer security event pipeline is structured. Feel free to ask questions in Discussions — I'll answer what I can.
+The mock driver mode lets you run everything without any kernel setup or GPU. It's a reasonable starting point for understanding how a multi-layer security event pipeline is structured. Feel free to ask questions in Discussions — I'll answer what I can, and I'd genuinely appreciate pointers from those who know more.
 
 **How to contribute:**
 - 🐛 Open an issue for bugs, wrong assumptions, or architectural critique
