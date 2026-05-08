@@ -1,0 +1,478 @@
+[
+  {
+    "id": "wl-default-001",
+    "matchType": "processName",
+    "value": "System",
+    "note": "Windows 内核进程",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-002",
+    "matchType": "processName",
+    "value": "Registry",
+    "note": "Windows 注册表进程（内核）",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-003",
+    "matchType": "processName",
+    "value": "smss.exe",
+    "note": "Session Manager Subsystem — 会话管理器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-004",
+    "matchType": "processName",
+    "value": "csrss.exe",
+    "note": "Client/Server Runtime — 子系统运行时",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-005",
+    "matchType": "processName",
+    "value": "wininit.exe",
+    "note": "Windows 初始化进程",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-006",
+    "matchType": "processName",
+    "value": "winlogon.exe",
+    "note": "Windows 登录进程",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-007",
+    "matchType": "processName",
+    "value": "services.exe",
+    "note": "Service Control Manager — 服务控制管理器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-008",
+    "matchType": "processName",
+    "value": "lsass.exe",
+    "note": "Local Security Authority — 本地安全验证",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-009",
+    "matchType": "processName",
+    "value": "lsaiso.exe",
+    "note": "LSA Isolated — Credential Guard 隔离",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-010",
+    "matchType": "processName",
+    "value": "svchost.exe",
+    "note": "Service Host — Windows 服务宿主",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-011",
+    "matchType": "processName",
+    "value": "spoolsv.exe",
+    "note": "Print Spooler — 打印后台处理程序",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-012",
+    "matchType": "processName",
+    "value": "taskhost.exe",
+    "note": "Task Host — Windows 任务宿主",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-013",
+    "matchType": "processName",
+    "value": "taskhostw.exe",
+    "note": "Task Host Windows",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-014",
+    "matchType": "processName",
+    "value": "taskeng.exe",
+    "note": "Task Scheduler Engine",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-015",
+    "matchType": "processName",
+    "value": "dwm.exe",
+    "note": "Desktop Window Manager — 桌面合成器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-016",
+    "matchType": "processName",
+    "value": "explorer.exe",
+    "note": "Windows Explorer — 文件资源管理器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-017",
+    "matchType": "processName",
+    "value": "sihost.exe",
+    "note": "Shell Infrastructure Host",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-018",
+    "matchType": "processName",
+    "value": "ShellExperienceHost.exe",
+    "note": "Windows Shell Experience Host",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-019",
+    "matchType": "processName",
+    "value": "StartMenuExperienceHost.exe",
+    "note": "开始菜单宿主",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-020",
+    "matchType": "processName",
+    "value": "SearchHost.exe",
+    "note": "Windows Search Host",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-021",
+    "matchType": "processName",
+    "value": "SearchIndexer.exe",
+    "note": "Windows Search Indexer — 搜索索引器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-022",
+    "matchType": "processName",
+    "value": "SearchApp.exe",
+    "note": "Windows Search App",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-023",
+    "matchType": "processName",
+    "value": "ApplicationFrameHost.exe",
+    "note": "UWP 应用框架宿主",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-024",
+    "matchType": "processName",
+    "value": "RuntimeBroker.exe",
+    "note": "Runtime Broker — UWP 权限代理",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-025",
+    "matchType": "processName",
+    "value": "fontdrvhost.exe",
+    "note": "Font Driver Host — 字体驱动宿主",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-026",
+    "matchType": "processName",
+    "value": "conhost.exe",
+    "note": "Console Host — 控制台宿主",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-027",
+    "matchType": "processName",
+    "value": "condrv.exe",
+    "note": "Console Driver Host",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-028",
+    "matchType": "processName",
+    "value": "dllhost.exe",
+    "note": "COM Surrogate — DLL 宿主进程",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-029",
+    "matchType": "processName",
+    "value": "ctfmon.exe",
+    "note": "CTF Loader — 输入法 & 语言栏",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-030",
+    "matchType": "processName",
+    "value": "rundll32.exe",
+    "note": "Run DLL as an App",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-031",
+    "matchType": "processName",
+    "value": "regsvr32.exe",
+    "note": "Register Server — 注册/注销 COM",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-032",
+    "matchType": "processName",
+    "value": "msiexec.exe",
+    "note": "Windows Installer — 安装程序",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-033",
+    "matchType": "processName",
+    "value": "WmiPrvSE.exe",
+    "note": "WMI Provider Host — WMI 提供程序宿主",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-034",
+    "matchType": "processName",
+    "value": "WmiApSrv.exe",
+    "note": "WMI Performance Adapter",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-035",
+    "matchType": "processName",
+    "value": "msdtc.exe",
+    "note": "Distributed Transaction Coordinator",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-036",
+    "matchType": "processName",
+    "value": "DiagTrack.exe",
+    "note": "诊断追踪服务",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-037",
+    "matchType": "processName",
+    "value": "sdiagnhost.exe",
+    "note": "Script Diagnostics Native Host",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-038",
+    "matchType": "processName",
+    "value": "audiodg.exe",
+    "note": "Windows Audio Device Graph — 音频引擎",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-039",
+    "matchType": "processName",
+    "value": "AudioSrv.dll",
+    "note": "Windows Audio Service",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-040",
+    "matchType": "processName",
+    "value": "wlanext.exe",
+    "note": "WLAN AutoConfig 扩展",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-041",
+    "matchType": "processName",
+    "value": "netsh.exe",
+    "note": "Network Shell — 网络配置命令行",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-042",
+    "matchType": "processName",
+    "value": "ipconfig.exe",
+    "note": "IP Configuration 工具",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-043",
+    "matchType": "processName",
+    "value": "dns.exe",
+    "note": "DNS Server Service",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-044",
+    "matchType": "processName",
+    "value": "MsMpEng.exe",
+    "note": "Windows Defender Antimalware Service",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-045",
+    "matchType": "processName",
+    "value": "NisSrv.exe",
+    "note": "Windows Defender Network Inspection",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-046",
+    "matchType": "processName",
+    "value": "SecurityHealthService.exe",
+    "note": "Windows Security Health Service",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-047",
+    "matchType": "processName",
+    "value": "SecurityHealthSystray.exe",
+    "note": "Windows Security 系统托盘",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-048",
+    "matchType": "processName",
+    "value": "SgrmBroker.exe",
+    "note": "System Guard Runtime Monitor Broker",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-049",
+    "matchType": "processName",
+    "value": "smartscreen.exe",
+    "note": "Windows SmartScreen — 安全筛选器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-050",
+    "matchType": "processName",
+    "value": "taskmgr.exe",
+    "note": "Task Manager — 任务管理器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-051",
+    "matchType": "processName",
+    "value": "mmc.exe",
+    "note": "Microsoft Management Console",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-052",
+    "matchType": "processName",
+    "value": "regedit.exe",
+    "note": "Registry Editor — 注册表编辑器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-053",
+    "matchType": "processName",
+    "value": "msconfig.exe",
+    "note": "System Configuration — 系统配置",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-054",
+    "matchType": "processName",
+    "value": "eventvwr.exe",
+    "note": "Event Viewer — 事件查看器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-055",
+    "matchType": "processName",
+    "value": "perfmon.exe",
+    "note": "Performance Monitor — 性能监视器",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-056",
+    "matchType": "processName",
+    "value": "control.exe",
+    "note": "Control Panel — 控制面板",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-057",
+    "matchType": "processName",
+    "value": "SystemSettings.exe",
+    "note": "Windows 设置应用",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-058",
+    "matchType": "processName",
+    "value": "UserAccountControlSettings.exe",
+    "note": "UAC 设置",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-059",
+    "matchType": "processName",
+    "value": "wuauclt.exe",
+    "note": "Windows Update AutoUpdate Client",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-060",
+    "matchType": "processName",
+    "value": "UsoClient.exe",
+    "note": "Update Session Orchestrator",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-061",
+    "matchType": "processName",
+    "value": "WaaSMedicAgent.exe",
+    "note": "Windows Update Medic Agent",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-062",
+    "matchType": "processName",
+    "value": "TiWorker.exe",
+    "note": "Windows Modules Installer Worker",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-063",
+    "matchType": "processName",
+    "value": "TrustedInstaller.exe",
+    "note": "Windows Modules Installer",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-064",
+    "matchType": "processName",
+    "value": "SppExtComObj.exe",
+    "note": "KMS 软件保护激活服务",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-065",
+    "matchType": "processName",
+    "value": "sppsvc.exe",
+    "note": "Software Protection Service",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-066",
+    "matchType": "processName",
+    "value": "vmwp.exe",
+    "note": "Virtual Machine Worker Process (Hyper-V)",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-067",
+    "matchType": "processName",
+    "value": "vmcompute.exe",
+    "note": "Hyper-V Host Compute Service",
+    "addedAt": 0
+  },
+  {
+    "id": "wl-default-068",
+    "matchType": "processName",
+    "value": "vmmem",
+    "note": "Hyper-V / WSL 虚拟机内存占用进程",
+    "addedAt": 0
+  }
+]

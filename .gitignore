@@ -1,0 +1,47 @@
+# ── LLM 模型权重（体积巨大，不上传）──────────────────────────────────────────
+LLM/QwenLLM/Qwen2.5-7B-Instruct/
+LLM/MyLLM/ZLLM-7B-Instruct/
+LLM/Happy-LLM/
+
+# ── 前端 ──────────────────────────────────────────────────────────────────────
+security-console/security-console/node_modules/
+security-console/security-console/dist/
+security-console/security-console/.env.local
+security-console/security-console/.env
+
+# ── C# 编译产物 ───────────────────────────────────────────────────────────────
+DriverServer/**/bin/
+DriverServer/**/obj/
+
+# ── 驱动编译产物 ──────────────────────────────────────────────────────────────
+DriverLayer/**/*.sys
+DriverLayer/**/*.pdb
+DriverLayer/**/*.obj
+DriverLayer/**/*.log
+DriverLayer/**/*.exp
+DriverLayer/**/*.lib
+DriverLayer/**/x64/
+DriverLayer/**/Debug/
+DriverLayer/**/Release/
+
+# ── Visual Studio ─────────────────────────────────────────────────────────────
+.vs/
+*.user
+*.suo
+*.ncb
+*.sdf
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+LLM/**/venv/
+LLM/**/.venv/
+
+# ── Claude Code 配置（本地专用）──────────────────────────────────────────────
+.claude/
+**/.claude/

@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Driver Files">
+      <UniqueIdentifier>{8E41214B-6785-4CFE-B992-037D68949A14}</UniqueIdentifier>
+      <Extensions>inf;inv;inx;mof;mc;</Extensions>
+    </Filter>
+    <Filter Include="入口">
+      <UniqueIdentifier>{b8530a0e-bc28-49bc-934a-c4f385d32935}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="派遣历程">
+      <UniqueIdentifier>{b4a9b91c-491d-44a8-9af6-5434de980639}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="回调帮助">
+      <UniqueIdentifier>{790086db-9b7a-4a22-9d86-5cf133e6ece5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="对象帮助">
+      <UniqueIdentifier>{8597d3c3-a75e-4277-89a0-1c07b6236f8b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="进程帮助">
+      <UniqueIdentifier>{6433e885-3259-4854-a464-3edefd1f4d77}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DriverEntry.c">
+      <Filter>入口</Filter>
+    </ClCompile>
+    <ClCompile Include="MajorFunction.c">
+      <Filter>派遣历程</Filter>
+    </ClCompile>
+    <ClCompile Include="CallBack.c">
+      <Filter>回调帮助</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectHelper.c">
+      <Filter>对象帮助</Filter>
+    </ClCompile>
+    <ClCompile Include="ProcessHelper.c">
+      <Filter>进程帮助</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DriverEntry.h">
+      <Filter>入口</Filter>
+    </ClInclude>
+    <ClInclude Include="MajorFunction.h">
+      <Filter>派遣历程</Filter>
+    </ClInclude>
+    <ClInclude Include="CallBack.h">
+      <Filter>回调帮助</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectHelper.h">
+      <Filter>对象帮助</Filter>
+    </ClInclude>
+    <ClInclude Include="ProcessHelper.h">
+      <Filter>进程帮助</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

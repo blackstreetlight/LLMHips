@@ -1,0 +1,24 @@
+﻿  Building 'ProcessHips' with toolset 'WindowsKernelModeDriver10.0' and the 'Desktop' target platform.
+  CallBack.c
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\CallBack.c(19,6): warning C4189: “i”: 局部变量已初始化但不引用
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\CallBack.c(34,56): warning C4100: “ProcessIdentify”: 未引用的形参
+  DriverEntry.c
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\DriverEntry.c(26,13): warning C4456: “i”的声明隐藏了上一个本地声明
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\DriverEntry.c(11,6): message : 参见“i”的声明
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\DriverEntry.c(4,67): warning C4100: “RegisterPath”: 未引用的形参
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\DriverEntry.c(11,6): warning C4189: “i”: 局部变量已初始化但不引用
+  MajorFunction.c
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\MajorFunction.c(39,45): warning C4100: “DeviceObject”: 未引用的形参
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\MajorFunction.c(48,45): warning C4100: “DeviceObject”: 未引用的形参
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\MajorFunction.c(77,46): warning C4100: “DeviceObject”: 未引用的形参
+  ObjectHelper.c
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\ObjectHelper.c(7,16): warning C4018: “<”: 有符号/无符号不匹配
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\ObjectHelper.c(22,19): warning C4018: “<”: 有符号/无符号不匹配
+  ProcessHelper.c
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\ProcessHelper.c(14,1): warning C4047: “初始化”:“KPROCESSOR_MODE”与“void *”的间接级别不同
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\ProcessHelper.c(31,21): warning C4996: 'ExAllocatePool': 被声明为已否决
+  正在生成代码...
+E:\未分析项目\ProcessHips\ProcessHips\ProcessHips\ProcessHelper.c(31): warning C4706: 条件表达式内的赋值
+  ProcessHips.vcxproj -> E:\未分析项目\ProcessHips\ProcessHips\x64\Debug\ProcessHips.sys
+  Inf2Cat task was skipped as there were no inf files to process
+  

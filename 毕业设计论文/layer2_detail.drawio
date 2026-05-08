@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="21.0.0">
+  <diagram id="layer2_cot_v5" name="CoT五维+少样本+ATT&amp;CK">
+    <mxGraphModel dx="1200" dy="700" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== 橙色提示条（全宽）===== -->
+        <mxCell id="prompt_note"
+          value="多维特征（进程溯源 · 父子进程链 · 命令行扫描）= Prompt 上下文输入，非推理步骤本身  ·  ★ Agent 工具调用层规划扩展"
+          style="text;html=1;strokeColor=#F9A825;fillColor=#FFF8E1;align=center;
+                 verticalAlign=middle;fontSize=10;fontStyle=1;fontColor=#E65100;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="16" width="1160" height="34" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== TOP-LEFT: 动态少样本增强 (w=566) ===== -->
+        <mxCell id="fs_bg"
+          value="动态少样本增强  ·  历史案例库检索注入  ·  越用越准"
+          style="swimlane;startSize=32;fillColor=#E8F5E9;strokeColor=#2E7D32;strokeWidth=2;
+                 fontSize=11;fontStyle=1;fontColor=#2E7D32;align=left;spacingLeft=10;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="56" width="566" height="358" as="geometry"/>
+        </mxCell>
+
+        <!-- 5 horizontal mini-steps: w=98 each, gap=8, total=5*98+4*8=522, start x=22 -->
+        <mxCell id="fs1" value="进程特征向量化&#xa;embedding 检索"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=10;"
+          vertex="1" parent="fs_bg">
+          <mxGeometry x="14" y="48" width="98" height="88" as="geometry"/>
+        </mxCell>
+        <mxCell id="fs2" value="案例库检索&#xa;Top-K 相似案例"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=10;"
+          vertex="1" parent="fs_bg">
+          <mxGeometry x="120" y="48" width="98" height="88" as="geometry"/>
+        </mxCell>
+        <mxCell id="fs3" value="Few-shot 注入&#xa;嵌入 Prompt"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#2E7D32;
+                 fontSize=10;fontStyle=1;strokeWidth=2;"
+          vertex="1" parent="fs_bg">
+          <mxGeometry x="226" y="48" width="98" height="88" as="geometry"/>
+        </mxCell>
+        <mxCell id="fs4" value="LLM 推理输出&#xa;含少样本引导"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontSize=10;"
+          vertex="1" parent="fs_bg">
+          <mxGeometry x="332" y="48" width="98" height="88" as="geometry"/>
+        </mxCell>
+        <mxCell id="fs5" value="结论写回案例库&#xa;□ 持久化积累"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;
+                 fontSize=10;dashed=1;strokeWidth=2;"
+          vertex="1" parent="fs_bg">
+          <mxGeometry x="438" y="48" width="112" height="88" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="efs12" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#388E3C;strokeWidth=1.5;" edge="1" parent="fs_bg" source="fs1" target="fs2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="efs23" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#388E3C;strokeWidth=1.5;" edge="1" parent="fs_bg" source="fs2" target="fs3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="efs34" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#388E3C;strokeWidth=1.5;" edge="1" parent="fs_bg" source="fs3" target="fs4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="efs45" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#F9A825;strokeWidth=1.5;dashed=1;" edge="1" parent="fs_bg" source="fs4" target="fs5"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Feedback arc: fs5 → fs2 -->
+        <mxCell id="efs_feedback"
+          value="案例反馈积累（□ 持久化规划扩展）"
+          style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=9;fontStyle=1;
+                 strokeColor=#F9A825;strokeWidth=2;dashed=1;
+                 exitX=0.5;exitY=1;exitDx=0;exitDy=0;
+                 entryX=0.5;entryY=1;entryDx=0;entryDy=0;"
+          edge="1" parent="fs_bg" source="fs5" target="fs2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="494" y="190"/>
+              <mxPoint x="169" y="190"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="fs_desc"
+          value="进程特征经 embedding 向量化后，从历史案例库检索 Top-K 相似案例，注入 Prompt 引导 LLM 推理。&#xa;分析结论自动写回案例库，样本持续积累 → 推理准确率持续提升（越用越准）"
+          style="text;html=1;align=left;fontSize=10;spacingLeft=10;verticalAlign=top;fontColor=#1B5E20;"
+          vertex="1" parent="fs_bg">
+          <mxGeometry x="0" y="212" width="566" height="52" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fs_note"
+          value="★ 核心优势：历史样本越多，推理准确率持续提升  ·  □ 持久化积累机制规划扩展"
+          style="text;html=1;align=center;fontSize=10;fontStyle=1;fontColor=#2E7D32;"
+          vertex="1" parent="fs_bg">
+          <mxGeometry x="0" y="316" width="566" height="26" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== TOP-RIGHT: ATT&CK 映射输出 (x=602, w=578) ===== -->
+        <mxCell id="out_bg"
+          value="ATT&amp;CK 映射输出  ·  结构化决策结果"
+          style="swimlane;startSize=32;fillColor=#FFEBEE;strokeColor=#B71C1C;strokeWidth=2;
+                 fontSize=11;fontStyle=1;fontColor=#B71C1C;align=left;spacingLeft=10;"
+          vertex="1" parent="1">
+          <mxGeometry x="602" y="56" width="578" height="358" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="attck_label" value="MITRE ATT&amp;CK 技术映射"
+          style="text;html=1;align=center;fontSize=11;fontStyle=1;fontColor=#B71C1C;"
+          vertex="1" parent="out_bg">
+          <mxGeometry x="0" y="36" width="578" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Technique grid: 2 cols × 3 rows, col_w=276, gap=6 -->
+        <mxCell id="a1" value="T1059.001  PowerShell 脚本执行"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=10;"
+          vertex="1" parent="out_bg"><mxGeometry x="10" y="60" width="276" height="34" as="geometry"/></mxCell>
+        <mxCell id="a2" value="T1027  混淆文件 / 信息"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=10;"
+          vertex="1" parent="out_bg"><mxGeometry x="292" y="60" width="276" height="34" as="geometry"/></mxCell>
+        <mxCell id="a3" value="T1055  进程注入"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=10;"
+          vertex="1" parent="out_bg"><mxGeometry x="10" y="102" width="276" height="34" as="geometry"/></mxCell>
+        <mxCell id="a4" value="T1047  WMI 命令执行"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=10;"
+          vertex="1" parent="out_bg"><mxGeometry x="292" y="102" width="276" height="34" as="geometry"/></mxCell>
+        <mxCell id="a5" value="TA0002  Execution 阶段"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EF9A9A;strokeColor=#B71C1C;fontSize=10;fontStyle=1;"
+          vertex="1" parent="out_bg"><mxGeometry x="10" y="144" width="276" height="34" as="geometry"/></mxCell>
+        <mxCell id="a6" value="TA0005  Defense Evasion"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EF9A9A;strokeColor=#B71C1C;fontSize=10;fontStyle=1;"
+          vertex="1" parent="out_bg"><mxGeometry x="292" y="144" width="276" height="34" as="geometry"/></mxCell>
+
+        <!-- Output fields: key(x=10,w=86) + value(x=102,w=466) -->
+        <mxCell id="ot1_k" value="risk_score:" style="text;html=1;align=left;fontSize=10;fontStyle=1;fontColor=#880E4F;verticalAlign=middle;" vertex="1" parent="out_bg"><mxGeometry x="10" y="186" width="86" height="28" as="geometry"/></mxCell>
+        <mxCell id="ot1_v" value="0.93  (HIGH)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F48FB1;strokeColor=#880E4F;fontSize=10;fontStyle=1;" vertex="1" parent="out_bg"><mxGeometry x="102" y="186" width="466" height="28" as="geometry"/></mxCell>
+
+        <mxCell id="ot2_k" value="action:" style="text;html=1;align=left;fontSize=10;fontStyle=1;fontColor=#880E4F;verticalAlign=middle;" vertex="1" parent="out_bg"><mxGeometry x="10" y="222" width="86" height="28" as="geometry"/></mxCell>
+        <mxCell id="ot2_v" value="KILL  →  ZwTerminateProcess(PID)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F48FB1;strokeColor=#880E4F;fontSize=10;fontStyle=1;" vertex="1" parent="out_bg"><mxGeometry x="102" y="222" width="466" height="28" as="geometry"/></mxCell>
+
+        <mxCell id="ot3_k" value="attck:" style="text;html=1;align=left;fontSize=10;fontStyle=1;fontColor=#880E4F;verticalAlign=middle;" vertex="1" parent="out_bg"><mxGeometry x="10" y="258" width="86" height="28" as="geometry"/></mxCell>
+        <mxCell id="ot3_v" value="[T1059.001, T1027, T1055, TA0002, TA0005]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#880E4F;fontSize=10;" vertex="1" parent="out_bg"><mxGeometry x="102" y="258" width="466" height="28" as="geometry"/></mxCell>
+
+        <mxCell id="ot4_k" value="reason:" style="text;html=1;align=left;fontSize=10;fontStyle=1;fontColor=#880E4F;verticalAlign=middle;" vertex="1" parent="out_bg"><mxGeometry x="10" y="294" width="86" height="28" as="geometry"/></mxCell>
+        <mxCell id="ot4_v" value="Office宏 → cmd → net user  |  C2信道 + 横移企图  |  置信度 0.93" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#880E4F;fontSize=10;" vertex="1" parent="out_bg"><mxGeometry x="102" y="294" width="466" height="28" as="geometry"/></mxCell>
+
+        <mxCell id="zw_bar"
+          value="ZwTerminateProcess(PID)  →  内核强制终止  [★ 已实现]"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EF9A9A;strokeColor=#880E4F;
+                 fontSize=11;fontStyle=1;fontColor=#880E4F;strokeWidth=2;"
+          vertex="1" parent="out_bg">
+          <mxGeometry x="10" y="332" width="558" height="18" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== BOTTOM: CoT 五维推理链（横向）===== -->
+        <mxCell id="cot_title"
+          value="CoT 五维推理链  ·  LLM 逐步推导（Chain-of-Thought）  ·  多维特征为上下文输入，五维为推理步骤"
+          style="text;html=1;strokeColor=#7B1FA2;fillColor=#F3E5F5;align=center;
+                 verticalAlign=middle;fontSize=12;fontStyle=1;fontColor=#7B1FA2;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="422" width="1160" height="32" as="geometry"/>
+        </mxCell>
+
+        <!-- 5 CoT boxes: w=224, gap=10, total=5*224+4*10=1160 ✓ -->
+        <!-- c1: x=20, c2: x=254, c3: x=488, c4: x=722, c5: x=956 -->
+
+        <mxCell id="c1" value="① 特征解构"
+          style="swimlane;startSize=32;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;
+                 fontSize=11;fontStyle=1;fontColor=#1565C0;align=center;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="460" width="224" height="314" as="geometry"/>
+        </mxCell>
+        <mxCell id="c1_desc" value="解析多维输入特征&#xa;提取关键行为指标&#xa;建立进程行为画像"
+          style="text;html=1;align=center;fontSize=10;verticalAlign=top;"
+          vertex="1" parent="c1"><mxGeometry x="0" y="36" width="224" height="54" as="geometry"/></mxCell>
+        <mxCell id="c1_ex" value="powershell.exe -enc ABCD...&#xa;→ 识别 Base64 混淆特征"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=9;"
+          vertex="1" parent="c1"><mxGeometry x="8" y="98" width="208" height="40" as="geometry"/></mxCell>
+        <mxCell id="c1_det" value="来源：进程溯源 + 命令行扫描&#xa;权重：路径异常 / 签名缺失 / 参数混淆"
+          style="text;html=1;align=left;fontSize=9;spacingLeft=6;fontColor=#1565C0;verticalAlign=top;"
+          vertex="1" parent="c1"><mxGeometry x="0" y="146" width="224" height="44" as="geometry"/></mxCell>
+        <mxCell id="c1_out" value="→ 结构化特征向量"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#1565C0;
+                 fontSize=9;fontStyle=1;fontColor=#FFFFFF;"
+          vertex="1" parent="c1"><mxGeometry x="8" y="278" width="208" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="c2" value="② 模式识别"
+          style="swimlane;startSize=32;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;
+                 fontSize=11;fontStyle=1;fontColor=#1565C0;align=center;"
+          vertex="1" parent="1">
+          <mxGeometry x="254" y="460" width="224" height="314" as="geometry"/>
+        </mxCell>
+        <mxCell id="c2_desc" value="对比少样本历史案例&#xa;匹配已知攻击模式&#xa;计算行为相似度"
+          style="text;html=1;align=center;fontSize=10;verticalAlign=top;"
+          vertex="1" parent="c2"><mxGeometry x="0" y="36" width="224" height="54" as="geometry"/></mxCell>
+        <mxCell id="c2_ex" value="行为与 Cobalt Strike Beacon&#xa;注入特征高度匹配"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=9;"
+          vertex="1" parent="c2"><mxGeometry x="8" y="98" width="208" height="40" as="geometry"/></mxCell>
+        <mxCell id="c2_det" value="参考：动态少样本库（Top-K 检索）&#xa;相似度阈值 ≥ 0.85 命中模式"
+          style="text;html=1;align=left;fontSize=9;spacingLeft=6;fontColor=#1565C0;verticalAlign=top;"
+          vertex="1" parent="c2"><mxGeometry x="0" y="146" width="224" height="44" as="geometry"/></mxCell>
+        <mxCell id="c2_out" value="→ 候选攻击模式集合"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1565C0;strokeColor=#1565C0;
+                 fontSize=9;fontStyle=1;fontColor=#FFFFFF;"
+          vertex="1" parent="c2"><mxGeometry x="8" y="278" width="208" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="c3" value="③ 因果推断"
+          style="swimlane;startSize=32;fillColor=#EDE7F6;strokeColor=#6A1B9A;strokeWidth=2;
+                 fontSize=11;fontStyle=1;fontColor=#6A1B9A;align=center;"
+          vertex="1" parent="1">
+          <mxGeometry x="488" y="460" width="224" height="314" as="geometry"/>
+        </mxCell>
+        <mxCell id="c3_desc" value="溯因进程调用意图&#xa;分析父子链异常路径&#xa;检测横向移动企图"
+          style="text;html=1;align=center;fontSize=10;verticalAlign=top;"
+          vertex="1" parent="c3"><mxGeometry x="0" y="36" width="224" height="54" as="geometry"/></mxCell>
+        <mxCell id="c3_ex" value="WINWORD → cmd → net user&#xa;推断 Office 宏 + 账户操控"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1C4E9;strokeColor=#6A1B9A;fontSize=9;"
+          vertex="1" parent="c3"><mxGeometry x="8" y="98" width="208" height="40" as="geometry"/></mxCell>
+        <mxCell id="c3_det" value="来源：父子进程链 + 进程溯源&#xa;检测：权限提升 / 异常路径 / 深度异常"
+          style="text;html=1;align=left;fontSize=9;spacingLeft=6;fontColor=#6A1B9A;verticalAlign=top;"
+          vertex="1" parent="c3"><mxGeometry x="0" y="146" width="224" height="44" as="geometry"/></mxCell>
+        <mxCell id="c3_out" value="→ 攻击意图置信度"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6A1B9A;strokeColor=#6A1B9A;
+                 fontSize=9;fontStyle=1;fontColor=#FFFFFF;"
+          vertex="1" parent="c3"><mxGeometry x="8" y="278" width="208" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="c4" value="④ ATT&amp;CK 映射"
+          style="swimlane;startSize=32;fillColor=#FFEBEE;strokeColor=#B71C1C;strokeWidth=2;
+                 fontSize=11;fontStyle=1;fontColor=#B71C1C;align=center;"
+          vertex="1" parent="1">
+          <mxGeometry x="722" y="460" width="224" height="314" as="geometry"/>
+        </mxCell>
+        <mxCell id="c4_desc" value="定位 MITRE 战术 &amp; 技术节点&#xa;输出 Technique 编号&#xa;战术阶段归类"
+          style="text;html=1;align=center;fontSize=10;verticalAlign=top;"
+          vertex="1" parent="c4"><mxGeometry x="0" y="36" width="224" height="54" as="geometry"/></mxCell>
+        <mxCell id="c4_ex" value="T1059.001 PowerShell&#xa;TA0002 Execution · TA0005 Evasion"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;"
+          vertex="1" parent="c4"><mxGeometry x="8" y="98" width="208" height="40" as="geometry"/></mxCell>
+        <mxCell id="c4_det" value="映射框架：MITRE ATT&amp;CK v14&#xa;匹配粒度：Sub-technique 级别"
+          style="text;html=1;align=left;fontSize=9;spacingLeft=6;fontColor=#B71C1C;verticalAlign=top;"
+          vertex="1" parent="c4"><mxGeometry x="0" y="146" width="224" height="44" as="geometry"/></mxCell>
+        <mxCell id="c4_out" value="→ Technique 编号列表"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B71C1C;strokeColor=#B71C1C;
+                 fontSize=9;fontStyle=1;fontColor=#FFFFFF;"
+          vertex="1" parent="c4"><mxGeometry x="8" y="278" width="208" height="24" as="geometry"/></mxCell>
+
+        <mxCell id="c5" value="⑤ 综合研判  ★"
+          style="swimlane;startSize=32;fillColor=#EDE7F6;strokeColor=#4A148C;strokeWidth=3;
+                 fontSize=11;fontStyle=1;fontColor=#4A148C;align=center;"
+          vertex="1" parent="1">
+          <mxGeometry x="956" y="460" width="224" height="314" as="geometry"/>
+        </mxCell>
+        <mxCell id="c5_desc" value="汇聚五维推理结论&#xa;输出风险等级评分&#xa;生成处置建议指令"
+          style="text;html=1;align=center;fontSize=10;verticalAlign=top;"
+          vertex="1" parent="c5"><mxGeometry x="0" y="36" width="224" height="54" as="geometry"/></mxCell>
+        <mxCell id="c5_ex" value="risk_score: 0.93  ·  action: KILL&#xa;reason: C2信道 + 横移企图确认"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D1C4E9;strokeColor=#4A148C;
+                 fontSize=9;fontStyle=1;"
+          vertex="1" parent="c5"><mxGeometry x="8" y="98" width="208" height="40" as="geometry"/></mxCell>
+        <mxCell id="c5_det" value="设计取舍：先放行 · 异步研判 · 事后击杀&#xa;窗口期约 3s（L1/L2 已过滤 95% 进程）"
+          style="text;html=1;align=left;fontSize=9;spacingLeft=6;fontColor=#B71C1C;verticalAlign=top;"
+          vertex="1" parent="c5"><mxGeometry x="0" y="146" width="224" height="44" as="geometry"/></mxCell>
+        <mxCell id="c5_out" value="→ 结构化 JSON 决策输出"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4A148C;strokeColor=#4A148C;
+                 fontSize=9;fontStyle=1;fontColor=#FFFFFF;"
+          vertex="1" parent="c5"><mxGeometry x="8" y="278" width="208" height="24" as="geometry"/></mxCell>
+
+        <!-- Horizontal arrows between CoT steps -->
+        <mxCell id="arr12" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#1565C0;strokeWidth=2;" edge="1" parent="1" source="c1" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="arr23" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6A1B9A;strokeWidth=2;" edge="1" parent="1" source="c2" target="c3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="arr34" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#B71C1C;strokeWidth=2;" edge="1" parent="1" source="c3" target="c4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="arr45" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4A148C;strokeWidth=3;" edge="1" parent="1" source="c4" target="c5"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Bottom legend -->
+        <mxCell id="bottom_note"
+          value="★ 已实现  ·  □ 规划扩展（答辩后实现）  ·  多维特征 = Prompt 上下文输入，并非 CoT 推理步骤本身"
+          style="text;html=1;strokeColor=none;fillColor=none;align=center;
+                 fontSize=10;fontStyle=1;fontColor=#455A64;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="782" width="1160" height="14" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
