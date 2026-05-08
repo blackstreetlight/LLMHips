@@ -14,15 +14,19 @@ DriverServer/**/bin/
 DriverServer/**/obj/
 
 # ── 驱动编译产物 ──────────────────────────────────────────────────────────────
-DriverLayer/**/*.sys
-DriverLayer/**/*.pdb
-DriverLayer/**/*.obj
-DriverLayer/**/*.log
-DriverLayer/**/*.exp
-DriverLayer/**/*.lib
-DriverLayer/**/x64/
-DriverLayer/**/Debug/
-DriverLayer/**/Release/
+**/*.sys
+**/*.pdb
+**/*.obj
+**/*.ilk
+**/*.exp
+**/*.lib
+**/*.aps
+**/*.pch
+**/x64/
+**/Debug/
+**/Release/
+**/*.exe
+**/*.dll
 
 # ── Visual Studio ─────────────────────────────────────────────────────────────
 .vs/
