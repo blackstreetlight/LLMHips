@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useSystemStore } from '../../store/useSystemStore';
 import type { AnalysisChatMessage } from '../../types/index';
 import {
@@ -24,21 +26,66 @@ interface ChatMessage {
  */
 function cleanModelOutput(text: string): string {
   return text
-    // 移除只含 risk_score / action 标签的代码块（包括 ```xml 和 ``` 两种形式）
-    .replace(/```(?:xml)?\s*\n?([\s\S]*?)```/g, (_, inner: string) => {
+    // 移除只含 risk_score / action 标签的代码块，同时保留语言标记
+    // 捕获组1 = 语言标记（如 python/java/powershell），捕获组2 = 代码内容
+    .replace(/```(\w*)\s*\n?([\s\S]*?)```/g, (_, lang: string, inner: string) => {
       const stripped = inner
         .replace(/<risk_score>\d+<\/risk_score>/g, '')
         .replace(/<action>(?:BLOCK|WATCH|ALLOW)<\/action>/g, '')
         .trim();
-      // 代码块里除了 XML 标签还有其他内容 → 保留（只去掉标签）
-      return stripped ? '```\n' + stripped + '\n```' : '';
+      // 代码块里除了 XML 标签还有其他内容 → 保留，并还原语言标记
+      if (!stripped) return '';
+      return lang ? `\`\`\`${lang}\n${stripped}\n\`\`\`` : `\`\`\`\n${stripped}\n\`\`\``;
     })
     // 移除残留的裸标签
     .replace(/<risk_score>\d+<\/risk_score>/g, '')
     .replace(/<action>(?:BLOCK|WATCH|ALLOW)<\/action>/g, '')
+    .replace(/<summary>[\s\S]*?<\/summary>/g, '')
     // 3+ 连续空行 → 2 行
     .replace(/\n{3,}/g, '\n')
     .trim();
+}
+
+/** 根据引擎预设构建发送给后端的 engine 配置对象 */
+function buildEnginePayload(
+  preset: string,
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+) {
+  if (preset === 'local') return { provider: 'local' };
+  if (preset === 'openai') return {
+    provider: 'openai',
+    api_key: apiKey,
+    model: model || 'gpt-4o',
+  };
+  if (preset === 'deepseek') return {
+    provider: 'openai',                        // DeepSeek 兼容 OpenAI 格式
+    api_key: apiKey,
+    base_url: 'https://api.deepseek.com/v1',
+    model: model || 'deepseek-chat',
+  };
+  if (preset === 'anthropic') return {
+    provider: 'anthropic',
+    api_key: apiKey,
+    model: model || 'claude-3-5-sonnet-20241022',
+  };
+  // custom
+  return {
+    provider: 'openai',
+    api_key: apiKey,
+    base_url: baseUrl,
+    model: model,
+  };
+}
+
+/** 根据引擎预设生成显示标签 */
+function engineLabel(preset: string, model: string) {
+  if (preset === 'local')     return 'Qwen2.5-7B · Local';
+  if (preset === 'openai')    return `${model || 'gpt-4o'} · OpenAI`;
+  if (preset === 'deepseek')  return `${model || 'deepseek-chat'} · DeepSeek`;
+  if (preset === 'anthropic') return `${model || 'claude-3-5-sonnet'} · Anthropic`;
+  return `${model || 'Custom'} · Cloud`;
 }
 
 export const LLMAnalysisView: React.FC = () => {
@@ -46,6 +93,9 @@ export const LLMAnalysisView: React.FC = () => {
     selectedEvent, setSelectedEvent,
     createAnalysisRecord, updateAnalysisChat, updateAnalysisVerdict, finalizeAnalysis,
     blockEvent, addToWhitelist,
+    writebackEnabled,
+    enginePreset, engineApiKey, engineBaseUrl, engineModel,
+    inferMaxTokens, inferTemperature, inferTopP, inferMaxHistory,
   } = useSystemStore();
 
   const [messages,     setMessages]     = useState<ChatMessage[]>([]);
@@ -53,6 +103,12 @@ export const LLMAnalysisView: React.FC = () => {
   const [showActions,  setShowActions]  = useState(false);
   const [question,     setQuestion]     = useState('');
   const [llmOffline,   setLlmOffline]   = useState(false);
+  // AI 研判结果缓存，供处置按钮写回时使用
+  const [lastAnalysis, setLastAnalysis] = useState<{
+    summary: string;
+    attackTechnique: string | null;
+    aiScore: number;
+  } | null>(null);
   const [blockSuccess, setBlockSuccess] = useState<{
     processName: string; pid: number; blockedAt: number;
   } | null>(null);
@@ -88,6 +144,7 @@ export const LLMAnalysisView: React.FC = () => {
     targetMsgId: string,
     isActive: () => boolean,
     onDone: (fullText: string) => void,
+    eventContext?: Record<string, unknown>,
   ) => {
     // 每次新请求都建一个独立的 AbortController
     const controller = new AbortController();
@@ -101,8 +158,11 @@ export const LLMAnalysisView: React.FC = () => {
         body: JSON.stringify({
           messages: apiMessages,
           system_extra: systemExtra,
-          max_new_tokens: 1024,
-          temperature: 0.7,
+          event_context: eventContext ?? null,
+          max_new_tokens: inferMaxTokens,
+          temperature: inferTemperature,
+          top_p: inferTopP,
+          engine: buildEnginePayload(enginePreset, engineApiKey, engineBaseUrl, engineModel),
         }),
       });
 
@@ -225,6 +285,7 @@ export const LLMAnalysisView: React.FC = () => {
       setQuestion('');
       setIsAiThinking(false);
       setLlmOffline(false);
+      setLastAnalysis(null);
       currentRecordIdRef.current = null;
       return;
     }
@@ -249,8 +310,11 @@ export const LLMAnalysisView: React.FC = () => {
       initialMsgId,
       isActive,
       (fullText) => {
-        const scoreMatch  = fullText.match(/<risk_score>(\d+)<\/risk_score>/);
-        const actionMatch = fullText.match(/<action>(BLOCK|WATCH|ALLOW)<\/action>/);
+        const scoreMatch   = fullText.match(/<risk_score>(\d+)<\/risk_score>/);
+        const actionMatch  = fullText.match(/<action>(BLOCK|WATCH|ALLOW)<\/action>/);
+        const summaryMatch = fullText.match(/<summary>([\s\S]*?)<\/summary>/);
+        const attackMatch  = fullText.match(/T\d{4}(?:\.\d{3})?/);
+
         const score = scoreMatch
           ? parseInt(scoreMatch[1])
           : (selectedEvent.riskLevel === 'high' ? 85 : selectedEvent.riskLevel === 'medium' ? 55 : 25);
@@ -258,11 +322,25 @@ export const LLMAnalysisView: React.FC = () => {
         const recommendation: 'block' | 'allow' | 'investigate' =
           action === 'BLOCK' ? 'block' : action === 'ALLOW' ? 'allow' : 'investigate';
 
+        // 缓存 AI 研判结果供处置按钮写回时使用
+        setLastAnalysis({
+          summary:        summaryMatch?.[1]?.trim() ?? '',
+          attackTechnique: attackMatch?.[0] ?? null,
+          aiScore:        score,
+        });
+
         updateAnalysisVerdict(recordId, {
           aiRiskLevel:      score >= 75 ? 'high' : score >= 40 ? 'medium' : 'low',
           aiConfidence:     score,
           aiRecommendation: recommendation,
         });
+      },
+      {
+        processName:       selectedEvent.processName,
+        processPath:       selectedEvent.processPath,
+        parentProcessName: selectedEvent.parentProcessName,
+        cmdLine:           selectedEvent.cmdLine,
+        isSigned:          selectedEvent.isSigned === 2,
       },
     );
 
@@ -277,6 +355,40 @@ export const LLMAnalysisView: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isAiThinking]);
+
+  // ─────────────────────────────────────────────────────────
+  // 写回案例库（人工处置后调用）
+  //  verdict   : 人工动作决定（BLOCK / ALLOW）
+  //  riskScore : 由动作推算（BLOCK → max(aiScore,75)，ALLOW → min(aiScore,39)）
+  //  summary / attackTechnique : 来自 AI 研判输出
+  // ─────────────────────────────────────────────────────────
+  const triggerWriteback = async (verdict: 'BLOCK' | 'ALLOW') => {
+    if (!writebackEnabled || !selectedEvent || !lastAnalysis) return;
+    const riskScore = verdict === 'BLOCK'
+      ? Math.max(lastAnalysis.aiScore, 75)
+      : Math.min(lastAnalysis.aiScore, 39);
+    try {
+      await fetch(`${LLM_URL}/writeback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_context: {
+            processName:       selectedEvent.processName,
+            processPath:       selectedEvent.processPath,
+            parentProcessName: selectedEvent.parentProcessName,
+            cmdLine:           selectedEvent.cmdLine,
+            isSigned:          selectedEvent.isSigned === 2,
+          },
+          verdict,
+          risk_score:       riskScore,
+          summary:          lastAnalysis.summary,
+          attack_technique: lastAnalysis.attackTechnique,
+        }),
+      });
+    } catch (e) {
+      console.warn('[LLMHips] 回写请求失败', e);
+    }
+  };
 
   // ─────────────────────────────────────────────────────────
   // 用户追问
@@ -301,10 +413,13 @@ export const LLMAnalysisView: React.FC = () => {
     setIsAiThinking(true);
 
     // 构造历史对话记录成为新对话的上下文
+    // inferMaxHistory=0 表示保留全部，否则取最近 N 轮（每轮 = 1 user + 1 ai，共 2 条消息）
+    const historyMessages = snapshotHistory.filter(m => !m.isStreaming && m.content);
+    const trimmed = inferMaxHistory > 0
+      ? historyMessages.slice(-inferMaxHistory * 2)
+      : historyMessages;
     const apiMessages = [
-      ...snapshotHistory
-        .filter(m => !m.isStreaming && m.content)
-        .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })),
+      ...trimmed.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })),
       { role: 'user', content: userContent },
     ];
 
@@ -361,10 +476,10 @@ export const LLMAnalysisView: React.FC = () => {
             ) : (
               <span className="flex items-center gap-1.5 text-xs text-green-400 font-mono">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_4px_#4ade80]" />
-                Qwen2.5-7B
+                {engineLabel(enginePreset, engineModel)}
               </span>
             )}
-            <button
+<button
               onClick={() => setSelectedEvent(null)}
               className="text-gray-400 hover:text-white transition-colors"
             >
@@ -447,7 +562,7 @@ export const LLMAnalysisView: React.FC = () => {
 
           <div className="flex justify-start">
             <span className="font-mono text-xs text-gray-600 border border-gray-700/80 rounded px-2 py-0.5">
-              Qwen2.5-7B-Instruct · Local
+              {engineLabel(enginePreset, engineModel)}
             </span>
           </div>
 
@@ -458,12 +573,59 @@ export const LLMAnalysisView: React.FC = () => {
                   <Bot size={16} className="text-[#00d4ff]" />
                 </div>
               )}
-              <div className={`max-w-[80%] rounded-lg p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap relative overflow-hidden
+              <div className={`max-w-[80%] rounded-lg p-4 text-sm leading-relaxed relative overflow-hidden select-text
                 ${msg.role === 'user'
-                  ? 'bg-[#1f6feb]/20 text-[#c9d1d9] border border-[#1f6feb]/30'
+                  ? 'bg-[#1f6feb]/20 text-[#c9d1d9] border border-[#1f6feb]/30 font-mono whitespace-pre-wrap'
                   : 'bg-[#161b22] text-gray-300 border border-[#30363d]'}`}
               >
-                {cleanModelOutput(msg.content)}
+                {msg.role === 'user' ? (
+                  cleanModelOutput(msg.content)
+                ) : (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => <h1 className="text-base font-bold text-gray-100 mb-2 mt-3 first:mt-0">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-sm font-bold text-gray-100 mb-2 mt-3 first:mt-0">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-sm font-semibold text-[#00d4ff] mb-1 mt-2 first:mt-0">{children}</h3>,
+                      h4: ({ children }) => <h4 className="text-xs font-semibold text-gray-300 mb-1 mt-2">{children}</h4>,
+                      p:  ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5 pl-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5 pl-1">{children}</ol>,
+                      li: ({ children }) => <li className="text-gray-300 leading-snug">{children}</li>,
+                      strong: ({ children }) => <strong className="font-bold text-gray-100">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
+                      // pre 包裹块级代码区域（带/不带语言标记都走这里）
+                      pre: ({ children }) => (
+                        <pre className="bg-[#0d1117] border border-[#30363d] rounded p-3 overflow-x-auto mb-2 text-xs font-mono text-gray-300 whitespace-pre">
+                          {children}
+                        </pre>
+                      ),
+                      // code：在 pre 内部 → 只负责字体，外框由 pre 提供
+                      //        行内 → 渲染青色小标签
+                      // 判断依据：有 className（language-xxx）或内容含换行 → 块级
+                      code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+                        const isBlock = !!className || String(children ?? '').includes('\n');
+                        return isBlock
+                          ? <code className="font-mono">{children}</code>
+                          : <code className="bg-[#0d1117] text-[#00d4ff] px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>;
+                      },
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-2 border-[#00d4ff]/50 pl-3 my-2 text-gray-400 italic">{children}</blockquote>
+                      ),
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto mb-2">
+                          <table className="text-xs border-collapse w-full">{children}</table>
+                        </div>
+                      ),
+                      thead: ({ children }) => <thead className="bg-[#0d1117]">{children}</thead>,
+                      th: ({ children }) => <th className="border border-[#30363d] px-2 py-1 text-left text-gray-300 font-semibold">{children}</th>,
+                      td: ({ children }) => <td className="border border-[#30363d] px-2 py-1 text-gray-400">{children}</td>,
+                      hr: () => <hr className="border-[#30363d] my-3" />,
+                    }}
+                  >
+                    {cleanModelOutput(msg.content)}
+                  </ReactMarkdown>
+                )}
                 {msg.isStreaming && (
                   <span className="inline-block w-2 h-4 bg-[#00d4ff] animate-pulse ml-1 align-middle" />
                 )}
@@ -517,7 +679,8 @@ export const LLMAnalysisView: React.FC = () => {
 
           <div className={`flex justify-end gap-3 transition-all duration-500 ${showActions ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
             <button
-              onClick={() => {
+              onClick={async () => {
+                await triggerWriteback('ALLOW');
                 if (currentRecordIdRef.current) finalizeAnalysis(currentRecordIdRef.current, 'allowed');
                 addToWhitelist({
                   matchType: 'processName',
@@ -531,7 +694,8 @@ export const LLMAnalysisView: React.FC = () => {
               加入白名单并放行
             </button>
             <button
-              onClick={() => {
+              onClick={async () => {
+                await triggerWriteback('BLOCK');
                 if (currentRecordIdRef.current) finalizeAnalysis(currentRecordIdRef.current, 'blocked');
                 // blockEvent 负责：① 发送 WebSocket kill 指令到 C# 中间层 → IOCTL → 驱动终止进程
                 //                  ② 从 events[] 删除该进程

@@ -6,6 +6,7 @@ import { ProcessDetailView } from './features/process-detail/ProcessDetailView';
 import { LLMHistoryView } from './features/llm-history/LLMHistoryView';
 import { BlockHistoryView } from './features/block-history/BlockHistoryView';
 import { ProcessTreeView } from './features/process-tree/ProcessTreeView';
+import { SettingsView } from './features/settings/SettingsView';
 import { useSystemStore } from './store/useSystemStore';
 import {
   LayoutDashboard, FileSearch, Bot, Terminal, ShieldCheck,
@@ -15,7 +16,7 @@ import {
 /**
  * 侧边栏页面 ID
  */
-type PageId = 'dashboard' | 'process-detail' | 'process-tree' | 'llm-history' | 'block-history';
+type PageId = 'dashboard' | 'process-detail' | 'process-tree' | 'llm-history' | 'block-history' | 'settings';
 
 /**
  * 侧边栏菜单项
@@ -206,8 +207,12 @@ export default function App() {
           </nav>
 
           {/* 底部设置 */}
-          <div className="group relative p-2.5 rounded-lg hover:bg-gray-800 cursor-pointer transition-colors shrink-0">
-            <Settings size={18} className="text-gray-500 group-hover:text-gray-300 transition-colors" />
+          <div
+            onClick={() => setActivePage('settings')}
+            className={`group relative p-2.5 rounded-lg cursor-pointer transition-colors shrink-0
+              ${activePage === 'settings' ? 'bg-[#00d4ff]/10' : 'hover:bg-gray-800'}`}
+          >
+            <Settings size={18} className={`transition-colors ${activePage === 'settings' ? 'text-[#00d4ff]' : 'text-gray-500 group-hover:text-gray-300'}`} />
             <span className="absolute left-12 top-1/2 -translate-y-1/2 bg-[#161b22] border border-gray-700 text-gray-200 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50 transition-opacity duration-150">
               设置
             </span>
@@ -256,6 +261,12 @@ export default function App() {
           {activePage === 'block-history' && (
             <div className="w-full h-full overflow-hidden">
               <BlockHistoryView />
+            </div>
+          )}
+
+          {activePage === 'settings' && (
+            <div className="w-full h-full overflow-hidden">
+              <SettingsView />
             </div>
           )}
         </div>

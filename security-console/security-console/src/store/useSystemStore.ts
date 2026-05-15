@@ -67,6 +67,34 @@ interface SystemState {
   connectWebSocket: () => void;
   disconnectWebSocket: () => void;
   toggleMonitoring: () => void;
+
+  // ── 全局设置 ──
+  writebackEnabled: boolean;
+  toggleWriteback: () => void;
+
+  // ── 推理引擎配置 ──
+  enginePreset: 'local' | 'openai' | 'deepseek' | 'anthropic' | 'custom';
+  engineApiKey: string;
+  engineBaseUrl: string;
+  engineModel: string;
+  setEngineConfig: (config: {
+    enginePreset?: 'local' | 'openai' | 'deepseek' | 'anthropic' | 'custom';
+    engineApiKey?: string;
+    engineBaseUrl?: string;
+    engineModel?: string;
+  }) => void;
+
+  // ── 推理参数 ──
+  inferMaxTokens: number;    // 最大输出 token 数，默认 1024
+  inferTemperature: number;  // 温度，默认 0.7
+  inferTopP: number;         // Top-P 核采样，默认 0.9
+  inferMaxHistory: number;   // 保留对话轮数，默认 10
+  setInferParams: (params: {
+    inferMaxTokens?: number;
+    inferTemperature?: number;
+    inferTopP?: number;
+    inferMaxHistory?: number;
+  }) => void;
 }
 
 
@@ -88,6 +116,22 @@ export const useSystemStore = create<SystemState>()(
       driverStatus: 'offline',
       isMonitoring: true,
       eventStats: { totalBlocked: 0, totalHigh: 0, totalMedium: 0, totalLow: 0, totalAllowed: 0 },
+      writebackEnabled: true,
+      toggleWriteback: () => set((state) => ({ writebackEnabled: !state.writebackEnabled })),
+
+      // ── 推理引擎配置初始值 ──
+      enginePreset: 'local',
+      engineApiKey: '',
+      engineBaseUrl: '',
+      engineModel: '',
+      setEngineConfig: (config) => set((state) => ({ ...state, ...config })),
+
+      // ── 推理参数初始值 ──
+      inferMaxTokens: 1024,
+      inferTemperature: 0.7,
+      inferTopP: 0.9,
+      inferMaxHistory: 10,
+      setInferParams: (params) => set((state) => ({ ...state, ...params })),
 
       // ── 事件操作 ──
       addEvent: (event) => set((state) => {
@@ -406,6 +450,15 @@ export const useSystemStore = create<SystemState>()(
         eventStats: state.eventStats,
         analysisRecords: state.analysisRecords,
         blockRecords: state.blockRecords,
+        writebackEnabled: state.writebackEnabled,
+        enginePreset: state.enginePreset,
+        engineApiKey: state.engineApiKey,
+        engineBaseUrl: state.engineBaseUrl,
+        engineModel: state.engineModel,
+        inferMaxTokens: state.inferMaxTokens,
+        inferTemperature: state.inferTemperature,
+        inferTopP: state.inferTopP,
+        inferMaxHistory: state.inferMaxHistory,
       }),
     }
   )
