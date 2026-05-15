@@ -1,16 +1,18 @@
 // Worker.cs
 using System.Text.Json;
 using SecurityBridge.Driver;
+using SecurityBridge.ETW;
 using SecurityBridge.Models;
 using SecurityBridge.WebSocket;
 
 /// <summary>
-/// 后台常驻工作线程：驱动事件轮询 + 心跳广播
+/// 后台常驻工作线程：驱动事件轮询 + 心跳广播 + ETW 行为监控
 /// </summary>
 public class Worker : BackgroundService
 {
     private readonly IDriverClient _driverClient;
     private readonly WebSocketConnectionManager _wsManager;
+    private readonly EtwMonitor _etwMonitor;
     private readonly ILogger<Worker> _logger;
     private readonly IConfiguration _config;
 
@@ -23,11 +25,13 @@ public class Worker : BackgroundService
     public Worker(
         IDriverClient driverClient,
         WebSocketConnectionManager wsManager,
+        EtwMonitor etwMonitor,
         ILogger<Worker> logger,
         IConfiguration config)
     {
         _driverClient = driverClient;
         _wsManager    = wsManager;
+        _etwMonitor   = etwMonitor;
         _logger       = logger;
         _config       = config;
     }
@@ -56,7 +60,12 @@ public class Worker : BackgroundService
         int heartbeatSec = _config.GetValue<int>("Bridge:HeartbeatIntervalSec", 30);
         _ = HeartbeatLoopAsync(heartbeatSec, stoppingToken);
 
-        // ── 第三步：主轮询循环 ────────────────────────────────────────────────
+        // ── 第三步：启动 ETW 监控（独立后台 Task，阻塞在内核事件泵内）──────────
+        // EtwMonitor.StartAsync 内部会检测 OS 平台和配置开关，
+        // macOS 开发环境下会直接返回，不影响正常运行。
+        _ = _etwMonitor.StartAsync(stoppingToken);
+
+        // ── 第四步：主轮询循环 ────────────────────────────────────────────────
         int pollIntervalMs = _config.GetValue<int>("Bridge:PollIntervalMs", 500);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -72,7 +81,11 @@ public class Worker : BackgroundService
 
                     if (evt.EventType == "exit")
                     {
-                        // 进程退出事件：轻量广播，仅携带 PID + 时间戳
+                        // 进程退出事件：
+                        // 1. 通知 ETW 停止追踪该 PID（防止 PID 复用导致误报）
+                        _etwMonitor.UntrackPid(evt.Pid);
+
+                        // 2. 轻量广播，仅携带 PID + 时间戳
                         var exitMsg = new WsMessage<object>
                         {
                             Type    = "process_exit",
@@ -83,7 +96,11 @@ public class Worker : BackgroundService
                     }
                     else
                     {
-                        // 进程创建事件：完整事件广播
+                        // 进程创建事件：
+                        // 1. 将新进程 PID 加入 ETW 追踪白名单（仅追踪可疑进程）
+                        _etwMonitor.TrackPid(evt.Pid);
+
+                        // 2. 完整事件广播
                         var createMsg = new WsMessage<ProcessEvent>
                         {
                             Type    = "process_event",
@@ -106,7 +123,7 @@ public class Worker : BackgroundService
             await Task.Delay(pollIntervalMs, stoppingToken);
         }
 
-        // ── 第四步：服务停止时断开驱动连接 ───────────────────────────────────
+        // ── 第五步：服务停止时断开驱动连接 ───────────────────────────────────
         await _driverClient.DisconnectAsync();
         _logger.LogInformation("Worker stopped, driver disconnected.");
     }

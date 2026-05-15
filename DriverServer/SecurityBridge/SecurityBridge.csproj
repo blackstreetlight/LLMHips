@@ -8,4 +8,12 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!--
+      ETW 遥测：提供 TraceEventSession / KernelTraceEventParser 等核心 API。
+      运行时仅在 Windows 管理员权限下生效；macOS 上会跳过（见 EtwMonitor.cs 的 OS 检测）。
+    -->
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.7" />
+  </ItemGroup>
+
 </Project>
