@@ -57,3 +57,4 @@ Picture/*.mp4
 # ── Claude Code 配置（本地专用）──────────────────────────────────────────────
 .claude/
 **/.claude/
+LLM/QwenLLM/FewShot/m_Json/
