@@ -119,6 +119,7 @@ public class WindowsDriverClient : IDriverClient
     private struct DRIVER_EVENT_BUFFER
     {
         // NOTE: EventType 字段已从此处移除，与当前编译的 .sys 驱动保持字节对齐。
+        public uint EventType;
         // 若驱动更新后在首位加入 EventType，请重新加回此字段并开启下方退出事件处理逻辑。
         public uint Pid;                // ULONG — 新进程 PID
         public uint ParentPid;          // ULONG — 父进程 PID
@@ -212,8 +213,20 @@ public class WindowsDriverClient : IDriverClient
             // 将非托管内存中的结构体拷贝到托管对象
             var buf = Marshal.PtrToStructure<DRIVER_EVENT_BUFFER>(pBuffer);
 
-            // NOTE: 当前驱动版本不含 EventType 字段，所有事件均视为进程创建事件。
-            // 若后续驱动升级并在 Common.h 首位加入 EventType，请恢复退出事件提前返回逻辑。
+            // ── 进程退出事件 ──────────────────────────────────────────────────
+            // 驱动在进程退出时触发回调，EventType=1，ProcessName/ProcessPath 为空。
+            // 直接构造轻量的 exit 事件返回，由 Worker 负责广播 process_exit 消息
+            // 并调用 EtwMonitor.UntrackPid()。
+            if (buf.EventType == 1)
+            {
+                return Task.FromResult<ProcessEvent?>(new ProcessEvent
+                {
+                    Id        = Guid.NewGuid().ToString(),
+                    EventType = "exit",
+                    Pid       = (int)buf.Pid,
+                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                });
+            }
 
             // ── 中间层补充签名验证 ────────────────────────────────────────────
             // 驱动层 IsSigned 恒为 SIGN_UNKNOWN(0)，由中间层通过 WinVerifyTrust 补充
@@ -551,9 +564,9 @@ public class WindowsDriverClient : IDriverClient
             foreach (var sp in suspiciousPaths)
             {
                 if (path.StartsWith(sp))
-                    buf.RiskLevel = 1; 
-                    buf.EventStatus = 1;
+                {
                     return "未签名程序从可疑目录启动";
+                }
             }
         }
 

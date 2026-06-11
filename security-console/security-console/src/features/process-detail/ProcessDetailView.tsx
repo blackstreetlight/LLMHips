@@ -6,12 +6,15 @@ import {
 } from 'lucide-react';
 import type { ProcessEvent } from '../../types/index';
 import { BlockSuccessModal } from '../../components/BlockSuccessModal';
+import { BehaviorChainTimeline } from './BehaviorChainTimeline';
 
 /**
  * 进程详情页
  * 展示所有已记录进程的完整信息（驱动上报的全部字段）
  */
-export const ProcessDetailView: React.FC = () => {
+export const ProcessDetailView: React.FC<{
+  onViewBehavior?: (event: ProcessEvent) => void;
+}> = ({ onViewBehavior }) => {
   const { events, setSelectedEvent, blockEvent } = useSystemStore();
 
   // ── 阻断成功弹窗 ──
@@ -205,6 +208,7 @@ export const ProcessDetailView: React.FC = () => {
                 onToggle={() => toggleExpand(ev.id)}
                 onAnalyze={() => setSelectedEvent(ev)}
                 onBlock={() => handleBlock(ev)}
+                onViewBehavior={() => onViewBehavior?.(ev)}
                 riskColor={riskColor}
                 statusBadge={statusBadge}
                 signedIcon={signedIcon}
@@ -237,11 +241,12 @@ const ProcessRow: React.FC<{
   onToggle: () => void;
   onAnalyze: () => void;
   onBlock: () => void;
+  onViewBehavior: () => void;
   riskColor: (l: string) => string;
   statusBadge: (s: string) => string;
   signedIcon: (v: number) => React.ReactNode;
   signedText: (v: number) => string;
-}> = ({ event: ev, isExpanded, onToggle, onAnalyze, onBlock, riskColor, statusBadge, signedIcon, signedText }) => {
+}> = ({ event: ev, isExpanded, onToggle, onAnalyze, onBlock, onViewBehavior, riskColor, statusBadge, signedIcon, signedText }) => {
 
   return (
     <div className={`transition-colors ${ev.terminated ? 'opacity-60 hover:opacity-80' : 'hover:bg-[#161b22]/60'}`}>
@@ -355,13 +360,22 @@ const ProcessRow: React.FC<{
             )}
           </div>
 
+          {/* ETW 行为链时间轴 */}
+          <BehaviorChainTimeline etwEvents={ev.etwEvents} />
+
           {/* 操作按钮 */}
           <div className="flex items-center gap-3 pt-2 border-t border-gray-800 mt-1">
             <button
-              onClick={(e) => { e.stopPropagation(); onAnalyze(); }}
+              onClick={(e) => { e.stopPropagation(); onViewBehavior(); }}
               className="px-3 py-1.5 rounded text-xs bg-[#00d4ff]/10 text-[#00d4ff] border border-[#00d4ff]/30 hover:bg-[#00d4ff]/20 transition-colors"
             >
-              LLM 深度研判
+              查看详情
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onAnalyze(); }}
+              className="px-3 py-1.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700 transition-colors"
+            >
+              LLM 研判（弹窗）
             </button>
             {!ev.terminated && (
               <button

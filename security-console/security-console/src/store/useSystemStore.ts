@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ProcessEvent, AnalysisRecord, AnalysisChatMessage, BlockRecord, WhitelistEntry } from '../types/index';
+import type { ProcessEvent, AnalysisRecord, AnalysisChatMessage, BlockRecord, WhitelistEntry, EtwEvent } from '../types/index';
+import { terminalBus } from '../lib/terminalBus';
 
 /**
  * 系统状态接口
@@ -42,6 +43,8 @@ interface SystemState {
   addEvent: (event: ProcessEvent) => void;
   setSelectedEvent: (event: ProcessEvent | null) => void;
   clearEvents: () => void;
+  /** 将 ETW 行为事件追加到对应进程的 etwEvents 数组（内嵌在 ProcessEvent 中） */
+  addEtwEvent: (event: EtwEvent) => void;
   /** 将指定 PID 的所有活跃事件标记为已结束（由 process_exit 消息触发） */
   markTerminated: (pid: number, terminatedAt: number) => void;
 
@@ -67,10 +70,19 @@ interface SystemState {
   connectWebSocket: () => void;
   disconnectWebSocket: () => void;
   toggleMonitoring: () => void;
+  /** 通过现有 WebSocket 连接向中间层发送任意消息（终端、技能调用等）。
+   *  返回 true 表示消息已入队发送，false 表示 WebSocket 未连接消息已丢弃。 */
+  sendWsMessage: (msg: object) => boolean;
 
   // ── 全局设置 ──
   writebackEnabled: boolean;
   toggleWriteback: () => void;
+
+  // ── AI 技能开关管理 ──
+  /** key 为技能 id（如 'terminal'），value 为是否启用，默认 true */
+  skillsEnabled: Record<string, boolean>;
+  /** 切换指定技能的启用状态 */
+  toggleSkill: (skillId: string) => void;
 
   // ── 推理引擎配置 ──
   enginePreset: 'local' | 'openai' | 'deepseek' | 'anthropic' | 'custom';
@@ -119,6 +131,15 @@ export const useSystemStore = create<SystemState>()(
       writebackEnabled: true,
       toggleWriteback: () => set((state) => ({ writebackEnabled: !state.writebackEnabled })),
 
+      // 技能默认全部启用
+      skillsEnabled: { terminal: true },
+      toggleSkill: (skillId) => set((state) => ({
+        skillsEnabled: {
+          ...state.skillsEnabled,
+          [skillId]: !(state.skillsEnabled[skillId] ?? true),
+        },
+      })),
+
       // ── 推理引擎配置初始值 ──
       enginePreset: 'local',
       engineApiKey: '',
@@ -153,6 +174,23 @@ export const useSystemStore = create<SystemState>()(
         events: [],
         eventStats: { totalBlocked: 0, totalHigh: 0, totalMedium: 0, totalLow: 0, totalAllowed: 0 },
       }),
+
+      /** 将 ETW 事件追加到对应 PID 的 ProcessEvent.etwEvents 中（时间升序，上限 200 条/进程） */
+      addEtwEvent: (etwEvent) => set((state) => ({
+        events: state.events.map(e =>
+          e.pid === etwEvent.pid
+            ? { ...e, etwEvents: [...(e.etwEvents ?? []), etwEvent].slice(-200) }
+            : e
+        ),
+        // selectedEvent 如果是同一个进程，同步更新（保证 LLMAnalysisView 实时拿到最新行为链）
+        selectedEvent:
+          state.selectedEvent?.pid === etwEvent.pid
+            ? {
+                ...state.selectedEvent,
+                etwEvents: [...(state.selectedEvent.etwEvents ?? []), etwEvent].slice(-200),
+              }
+            : state.selectedEvent,
+      })),
 
       markTerminated: (pid, terminatedAt) => set((state) => ({
         events: state.events.map(e =>
@@ -399,6 +437,13 @@ export const useSystemStore = create<SystemState>()(
               }
             }
 
+            // ── ETW 行为事件 ──
+            // EtwMonitor.cs 采集到符合条件的文件/注册表/网络事件后广播
+            // payload: EtwEvent（字段与 C# EtwEvent.cs 完全对齐）
+            if (message.type === 'etw_event' && message.payload) {
+              get().addEtwEvent(message.payload as EtwEvent);
+            }
+
             // ── 进程退出事件 ──
             // Worker.cs 在收到 EventType=exit 的驱动事件后广播此消息
             // payload: { pid, timestamp }
@@ -406,6 +451,23 @@ export const useSystemStore = create<SystemState>()(
               const { pid, timestamp } = message.payload as { pid: number; timestamp: number };
               get().markTerminated(pid, timestamp);
               console.log(`[EXIT] PID ${pid} 已结束 @ ${new Date(timestamp).toLocaleTimeString()}`);
+            }
+
+            // ── 终端交互输出（点对点，只有当前连接收到）──
+            // TerminalSessionManager.cs 将 shell stdout/stderr 包装成此消息
+            // payload: { data: string }
+            if (message.type === 'terminal_output' && message.payload?.data) {
+              terminalBus.emit(message.payload.data as string);
+            }
+
+            // ── AI 技能命令执行结果（点对点）──
+            // TerminalSessionManager.cs 执行完 terminal_command 后返回此消息
+            // payload: { requestId, output, exitCode }
+            if (message.type === 'terminal_command_result' && message.payload) {
+              const { requestId, output, exitCode } = message.payload as {
+                requestId: string; output: string; exitCode: number;
+              };
+              terminalBus.emitCommandResult(requestId, output, exitCode);
             }
           } catch (err) {
             console.error('[WS] 解析中间层事件失败:', err);
@@ -441,16 +503,28 @@ export const useSystemStore = create<SystemState>()(
         if (_ws) { _ws.close(); _ws = null; }
         set({ driverStatus: 'offline' });
       },
+
+      sendWsMessage: (msg: object): boolean => {
+        if (_ws && _ws.readyState === WebSocket.OPEN) {
+          _ws.send(JSON.stringify(msg));
+          return true;
+        }
+        console.warn('[WS] sendWsMessage: WebSocket 未连接，消息丢弃', msg);
+        return false;
+      },
     }),
     {
       name: 'sentinel-security-store',
       // 白名单不再走 localStorage，改由 /whitelist 文件持久化；应用启动时 loadWhitelist() 读取
       partialize: (state) => ({
-        events: state.events,
+        // ETW 事件是运行时数据，持久化时清空，避免撑爆 localStorage（5~10MB 限制）
+        // 行为链在 AnalysisRecord 的 event 快照里已经保留
+        events: state.events.map(e => ({ ...e, etwEvents: [] })),
         eventStats: state.eventStats,
         analysisRecords: state.analysisRecords,
         blockRecords: state.blockRecords,
         writebackEnabled: state.writebackEnabled,
+        skillsEnabled: state.skillsEnabled,
         enginePreset: state.enginePreset,
         engineApiKey: state.engineApiKey,
         engineBaseUrl: state.engineBaseUrl,

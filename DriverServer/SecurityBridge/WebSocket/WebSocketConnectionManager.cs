@@ -75,6 +75,35 @@ public class WebSocketConnectionManager
         }
     }
 
+    /// <summary>
+    /// 向指定连接 ID 的客户端点对点发送消息（不广播）。
+    /// 用于终端输出、命令结果等只需返回给特定前端的场景。
+    /// </summary>
+    public async Task SendToAsync(string connId, string jsonMessage)
+    {
+        if (!_connections.TryGetValue(connId, out var ws)) return;
+        if (ws.State != WebSocketState.Open)
+        {
+            RemoveConnection(connId);
+            return;
+        }
+
+        try
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(jsonMessage);
+            await ws.SendAsync(
+                new ArraySegment<byte>(bytes),
+                WebSocketMessageType.Text,
+                true,
+                CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send to WebSocket {Id}, removing.", connId);
+            RemoveConnection(connId);
+        }
+    }
+
     /// <summary>当前已连接的客户端数量</summary>
     public int Count => _connections.Count;
 }

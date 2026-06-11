@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using SecurityBridge.Driver;
 using SecurityBridge.Models;
+using SecurityBridge.Terminal;
 
 namespace SecurityBridge.WebSocket;
 
@@ -16,6 +17,7 @@ public class WebSocketHandler
 {
     private readonly WebSocketConnectionManager _manager;
     private readonly IDriverClient _driverClient;
+    private readonly TerminalSessionManager _terminalManager;
     private readonly ILogger<WebSocketHandler> _logger;
 
     // JSON 序列化选项：camelCase，与前端 TypeScript 接口对齐
@@ -28,11 +30,13 @@ public class WebSocketHandler
     public WebSocketHandler(
         WebSocketConnectionManager manager,
         IDriverClient driverClient,
+        TerminalSessionManager terminalManager,
         ILogger<WebSocketHandler> logger)
     {
-        _manager      = manager;
-        _driverClient = driverClient;
-        _logger       = logger;
+        _manager         = manager;
+        _driverClient    = driverClient;
+        _terminalManager = terminalManager;
+        _logger          = logger;
     }
 
     /// <summary>
@@ -54,8 +58,9 @@ public class WebSocketHandler
         }
         finally
         {
-            // 无论正常关闭还是异常，都从连接池移除
+            // 无论正常关闭还是异常，都从连接池移除，并清理对应终端会话
             _manager.RemoveConnection(connId);
+            await _terminalManager.OnConnectionClosedAsync(connId);
 
             // 若连接还未关闭，主动发送 Close 帧
             if (ws.State == WebSocketState.Open)
@@ -156,6 +161,41 @@ public class WebSocketHandler
                     Payload = new { timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }
                 });
                 break;
+
+            // ── 终端：启动交互 Shell ──────────────────────────────────
+            case "terminal_start":
+                await _terminalManager.StartSessionAsync(connId);
+                break;
+
+            // ── 终端：向 Shell 发送键盘输入 ──────────────────────────
+            case "terminal_input":
+            {
+                // payload: { data: string }  —— 原始键盘字符（含控制字符）
+                string? data = root?["payload"]?["data"]?.GetValue<string>();
+                if (!string.IsNullOrEmpty(data))
+                    await _terminalManager.WriteInputAsync(connId, data);
+                break;
+            }
+
+            // ── 终端：关闭 Shell 会话 ─────────────────────────────────
+            case "terminal_close":
+                await _terminalManager.CloseSessionAsync(connId);
+                break;
+
+            // ── AI 技能：批量执行单条命令，结果点对点返回 ─────────────
+            case "terminal_command":
+            {
+                // payload: { requestId: string, cmd: string, timeout?: number }
+                var payload   = root?["payload"];
+                string? reqId = payload?["requestId"]?.GetValue<string>();
+                string? cmd   = payload?["cmd"]?.GetValue<string>();
+                int timeout   = payload?["timeout"]?.GetValue<int>() ?? 15;
+
+                if (!string.IsNullOrEmpty(reqId) && !string.IsNullOrEmpty(cmd))
+                    // 异步执行，不阻塞消息接收循环
+                    _ = _terminalManager.RunCommandAsync(connId, reqId, cmd, timeout);
+                break;
+            }
 
             default:
                 _logger.LogWarning("WebSocket {Id} sent unknown message type: {Type}", connId, type);

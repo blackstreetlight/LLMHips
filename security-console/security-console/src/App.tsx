@@ -3,20 +3,28 @@ import { Dashboard } from './features/dashboard/Dashboard';
 import { MonitorPanel } from './features/monitor/MonitorPanel';
 import { LLMAnalysisView } from './features/llm/LLMAnalysisView';
 import { ProcessDetailView } from './features/process-detail/ProcessDetailView';
+import { ProcessBehaviorView } from './features/process-behavior/ProcessBehaviorView';
 import { LLMHistoryView } from './features/llm-history/LLMHistoryView';
 import { BlockHistoryView } from './features/block-history/BlockHistoryView';
 import { ProcessTreeView } from './features/process-tree/ProcessTreeView';
 import { SettingsView } from './features/settings/SettingsView';
+import { TerminalView } from './features/terminal/TerminalView';
 import { useSystemStore } from './store/useSystemStore';
+import type { ProcessEvent } from './types/index';
+import { registerTerminalSkill } from './features/skills/handlers/terminalSkillHandler';
 import {
   LayoutDashboard, FileSearch, Bot, Terminal, ShieldCheck,
-  Settings, LogOut, Power, ShieldOff, GitBranch,
+  Settings, LogOut, Power, ShieldOff, GitBranch, TerminalSquare,
 } from 'lucide-react';
+
+// ── 一次性注册 AI 技能（应用启动时执行）──────────────────────────────────────
+// 后续新增技能，在此处追加 registerXxxSkill() 即可
+let _skillsRegistered = false;
 
 /**
  * 侧边栏页面 ID
  */
-type PageId = 'dashboard' | 'process-detail' | 'process-tree' | 'llm-history' | 'block-history' | 'settings';
+type PageId = 'dashboard' | 'process-detail' | 'process-tree' | 'llm-history' | 'block-history' | 'terminal' | 'settings';
 
 /**
  * 侧边栏菜单项
@@ -27,11 +35,15 @@ const sidebarItems: { id: PageId; icon: typeof LayoutDashboard; label: string }[
   { id: 'process-tree',   icon: GitBranch,       label: '进程树' },
   { id: 'llm-history',   icon: Bot,             label: 'LLM 研判历史' },
   { id: 'block-history', icon: ShieldOff,       label: '阻断历史' },
+  { id: 'terminal',      icon: TerminalSquare,  label: '终端控制' },
 ];
 
 export default function App() {
   // ── 页面路由 ──
   const [activePage, setActivePage] = useState<PageId>('dashboard');
+  const { sendWsMessage } = useSystemStore();
+  // 进程行为详情面板：选中的进程
+  const [behaviorEvent, setBehaviorEvent] = useState<ProcessEvent | null>(null);
 
   // ── 面板拖拽 ──
   const [leftWidth, setLeftWidth] = useState(65);
@@ -40,6 +52,13 @@ export default function App() {
 
   // ── Store ──
   const { driverStatus, isMonitoring, toggleMonitoring, eventStats, loadWhitelist } = useSystemStore();
+
+  // ── 注册 AI 技能（仅首次 render 时执行一次）──
+  useEffect(() => {
+    if (_skillsRegistered) return;
+    _skillsRegistered = true;
+    registerTerminalSkill((msg) => sendWsMessage(msg));
+  }, [sendWsMessage]);
 
   // 应用启动时从 whitelist.json 加载白名单
   useEffect(() => {
@@ -172,7 +191,7 @@ export default function App() {
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-7 bg-[#00d4ff] rounded-r shadow-[0_0_6px_#00d4ff]" />
                   )}
                   <div
-                    onClick={() => setActivePage(id)}
+                    onClick={() => { setActivePage(id); setBehaviorEvent(null); }}
                     className={`group relative p-2.5 rounded-lg cursor-pointer transition-colors
                       ${isActive ? 'bg-[#00d4ff]/10' : 'hover:bg-gray-800'}`}
                   >
@@ -240,9 +259,22 @@ export default function App() {
             </>
           )}
 
-          {activePage === 'process-detail' && (
+          {activePage === 'process-detail' && !behaviorEvent && (
             <div className="w-full h-full overflow-hidden">
-              <ProcessDetailView />
+              <ProcessDetailView
+                onViewBehavior={(ev) => {
+                  setBehaviorEvent(ev);
+                }}
+              />
+            </div>
+          )}
+
+          {activePage === 'process-detail' && behaviorEvent && (
+            <div className="w-full h-full overflow-hidden">
+              <ProcessBehaviorView
+                event={behaviorEvent}
+                onBack={() => setBehaviorEvent(null)}
+              />
             </div>
           )}
 
@@ -261,6 +293,12 @@ export default function App() {
           {activePage === 'block-history' && (
             <div className="w-full h-full overflow-hidden">
               <BlockHistoryView />
+            </div>
+          )}
+
+          {activePage === 'terminal' && (
+            <div className="w-full h-full overflow-hidden">
+              <TerminalView />
             </div>
           )}
 

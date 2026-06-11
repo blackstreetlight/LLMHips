@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using SecurityBridge.Driver;
 using SecurityBridge.ETW;
+using SecurityBridge.Terminal;
 using SecurityBridge.WebSocket;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +27,9 @@ else
 
 // ── 注册 WebSocket 连接池（单例，全局共享）────────────────────────────────────
 builder.Services.AddSingleton<WebSocketConnectionManager>();
+
+// ── 注册终端会话管理器（单例，管理所有 shell 子进程）────────────────────────────
+builder.Services.AddSingleton<TerminalSessionManager>();
 
 // ── 注册 ETW 监控器（单例，由 Worker 持有并驱动）─────────────────────────────
 // EtwMonitor 本身只在 Windows + 管理员权限下生效；其他平台自动跳过
@@ -70,6 +74,7 @@ app.Map("/ws", async context =>
         var handler = new WebSocketHandler(
             context.RequestServices.GetRequiredService<WebSocketConnectionManager>(),
             context.RequestServices.GetRequiredService<IDriverClient>(),
+            context.RequestServices.GetRequiredService<TerminalSessionManager>(),
             context.RequestServices.GetRequiredService<ILogger<WebSocketHandler>>()
         );
         await handler.HandleAsync(context);

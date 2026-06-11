@@ -16,6 +16,9 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly IConfiguration _config;
 
+    // Mock 模式下用于记录活跃 PID，供 ETW 模拟事件使用
+    private readonly List<int> _mockActivePids = new();
+
     // JSON 序列化选项：字段名转为 camelCase，与前端 TypeScript 接口对齐
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -60,10 +63,13 @@ public class Worker : BackgroundService
         int heartbeatSec = _config.GetValue<int>("Bridge:HeartbeatIntervalSec", 30);
         _ = HeartbeatLoopAsync(heartbeatSec, stoppingToken);
 
-        // ── 第三步：启动 ETW 监控（独立后台 Task，阻塞在内核事件泵内）──────────
-        // EtwMonitor.StartAsync 内部会检测 OS 平台和配置开关，
-        // macOS 开发环境下会直接返回，不影响正常运行。
-        _ = _etwMonitor.StartAsync(stoppingToken);
+        // ── 第三步：启动 ETW 监控 / Mock ETW 模拟 ───────────────────────────
+        // 真实模式：EtwMonitor.StartAsync 阻塞在内核事件泵（macOS 直接返回）
+        // Mock 模式：另起一个模拟循环，定期为活跃进程生成假 ETW 事件供前端调试
+        if (_driverClient is MockDriverClient)
+            _ = MockEtwLoopAsync(stoppingToken);
+        else
+            _ = _etwMonitor.StartAsync(stoppingToken);
 
         // ── 第四步：主轮询循环 ────────────────────────────────────────────────
         int pollIntervalMs = _config.GetValue<int>("Bridge:PollIntervalMs", 500);
@@ -99,6 +105,11 @@ public class Worker : BackgroundService
                         // 进程创建事件：
                         // 1. 将新进程 PID 加入 ETW 追踪白名单（仅追踪可疑进程）
                         _etwMonitor.TrackPid(evt.Pid);
+                        // Mock 模式下同时记录活跃 PID 供模拟 ETW 使用
+                        if (_driverClient is MockDriverClient)
+                        {
+                            lock (_mockActivePids) { _mockActivePids.Add(evt.Pid); if (_mockActivePids.Count > 50) _mockActivePids.RemoveAt(0); }
+                        }
 
                         // 2. 完整事件广播
                         var createMsg = new WsMessage<ProcessEvent>
@@ -126,6 +137,102 @@ public class Worker : BackgroundService
         // ── 第五步：服务停止时断开驱动连接 ───────────────────────────────────
         await _driverClient.DisconnectAsync();
         _logger.LogInformation("Worker stopped, driver disconnected.");
+    }
+
+    /// <summary>
+    /// Mock 模式 ETW 模拟循环：每隔 600~1200ms 为某个活跃进程随机生成 1~3 条 ETW 行为事件，
+    /// 用于前端开发调试（行为链时间轴、展开全部按钮等功能的验证）。
+    /// </summary>
+    private async Task MockEtwLoopAsync(CancellationToken ct)
+    {
+        var rng = new Random();
+
+        string[][] fileTargets =
+        [
+            [@"C:\Users\Admin\AppData\Local\Temp\payload.bin", "high",    "可疑 Temp 目录写入"],
+            [@"C:\Windows\System32\drivers\etc\hosts",         "high",    "hosts 文件篡改"],
+            [@"C:\Users\Admin\Documents\report.docx",          "low",     ""],
+            [@"C:\ProgramData\malware\persist.exe",            "high",    "ProgramData 可执行文件写入"],
+            [@"C:\Windows\Temp\inject.dll",                    "medium",  "系统 Temp 目录写入"],
+            [@"C:\Users\Admin\Desktop\readme.txt",             "low",     ""],
+        ];
+        string[][] regTargets =
+        [
+            [@"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\Backdoor", "high",   "注册表自启动项写入"],
+            [@"HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Agent",    "high",   "用户自启动项写入"],
+            [@"HKLM\SYSTEM\CurrentControlSet\Services\MalSvc",               "medium", "服务注册"],
+            [@"HKCU\Software\Classes\ms-settings\shell\open\command",        "high",   "COM 劫持"],
+            [@"HKLM\SOFTWARE\Policies\Microsoft\Windows Defender",           "medium", "Defender 策略修改"],
+        ];
+        string[][] netTargets =
+        [
+            ["185.62.188.10:4444",  "high",   "命中 C2 外联规则"],
+            ["10.0.0.5:445",        "medium", "SMB 横向移动尝试"],
+            ["8.8.8.8:53",          "low",    ""],
+            ["192.168.1.100:8080",  "medium", "内网 HTTP 扫描"],
+            ["23.44.112.8:443",     "low",    ""],
+        ];
+
+        string[] fileActions = ["Create", "Write", "Delete"];
+        string[] regActions  = ["SetValue", "CreateKey", "DeleteKey"];
+        string[] netActions  = ["Connect", "UdpSend"];
+
+        while (!ct.IsCancellationRequested)
+        {
+            await Task.Delay(rng.Next(600, 1200), ct);
+            if (ct.IsCancellationRequested) break;
+
+            int pid;
+            lock (_mockActivePids)
+            {
+                if (_mockActivePids.Count == 0) continue;
+                pid = _mockActivePids[rng.Next(_mockActivePids.Count)];
+            }
+
+            // 每次生成 1~3 条 ETW 事件
+            int count = rng.Next(1, 4);
+            for (int i = 0; i < count; i++)
+            {
+                int kind = rng.Next(3); // 0=File, 1=Registry, 2=Network
+                string category, action, target, severity, rule;
+
+                if (kind == 0)
+                {
+                    var t = fileTargets[rng.Next(fileTargets.Length)];
+                    category = "File"; action = fileActions[rng.Next(fileActions.Length)];
+                    target = t[0]; severity = t[1]; rule = t[2];
+                }
+                else if (kind == 1)
+                {
+                    var t = regTargets[rng.Next(regTargets.Length)];
+                    category = "Registry"; action = regActions[rng.Next(regActions.Length)];
+                    target = t[0]; severity = t[1]; rule = t[2];
+                }
+                else
+                {
+                    var t = netTargets[rng.Next(netTargets.Length)];
+                    category = "Network"; action = netActions[rng.Next(netActions.Length)];
+                    target = t[0]; severity = t[1]; rule = t[2];
+                }
+
+                var etwEvt = new EtwEvent
+                {
+                    Id              = Guid.NewGuid().ToString(),
+                    Timestamp       = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    Pid             = pid,
+                    ProcessName     = "mock.exe",
+                    Category        = category,
+                    Action          = action,
+                    Target          = target,
+                    Severity        = severity,
+                    RuleDescription = rule,
+                };
+
+                var msg  = new WsMessage<EtwEvent> { Type = "etw_event", Payload = etwEvt };
+                var json = JsonSerializer.Serialize(msg, _jsonOptions);
+                await _wsManager.BroadcastAsync(json);
+            }
+        }
     }
 
     /// <summary>

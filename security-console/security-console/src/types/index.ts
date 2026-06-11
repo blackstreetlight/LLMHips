@@ -35,6 +35,8 @@ export interface ProcessEvent {
   terminated?: boolean;
   /** 进程结束时间戳（Unix 毫秒） */
   terminatedAt?: number;
+  /** 运行时 ETW 行为事件（时间升序，内存态，不持久化） */
+  etwEvents?: EtwEvent[];
 }
 
 /**
@@ -106,6 +108,31 @@ export interface BlockRecord {
   processCreatedAt: number;
   /** 用户执行阻断的时间（Unix 毫秒） */
   blockedAt: number;
+}
+
+/**
+ * ETW 行为事件
+ * 对应 C# EtwEvent.cs，由中间层通过 type="etw_event" 推送
+ */
+export interface EtwEvent {
+  /** 事件唯一 ID（桥接层生成 GUID） */
+  id: string;
+  /** 事件时间戳（Unix 毫秒） */
+  timestamp: number;
+  /** 关联进程 PID */
+  pid: number;
+  /** 进程名（冗余，便于独立展示） */
+  processName: string;
+  /** 行为类别：文件/注册表/网络 */
+  category: 'File' | 'Registry' | 'Network';
+  /** 具体动作（Create / Write / Delete / Connect / Query …） */
+  action: string;
+  /** 操作目标（路径 / 注册表键 / IP:Port） */
+  target: string;
+  /** 严重程度（由中间层根据规则推断） */
+  severity: 'high' | 'medium' | 'low';
+  /** 触发的规则描述 */
+  ruleDescription: string;
 }
 
 /**

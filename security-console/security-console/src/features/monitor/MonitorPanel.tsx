@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useSystemStore } from '../../store/useSystemStore';
-import { ShieldAlert, Activity, CheckCircle, Trash2, Lock, LockOpen, HelpCircle, ShieldCheck, EyeOff } from 'lucide-react';
+import { ShieldAlert, Activity, CheckCircle, Trash2, Lock, LockOpen, HelpCircle, ShieldCheck, EyeOff, Zap } from 'lucide-react';
 import { WhitelistDrawer } from './WhitelistDrawer';
 
 /**
@@ -178,12 +178,24 @@ export const MonitorPanel: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right: status badge + time */}
-              <div className="text-right text-sm shrink-0 ml-3">
-                <span className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeClass(ev.status)}`}>
-                  {ev.status.toUpperCase()}
-                </span>
-                <p className="text-gray-500 mt-1 text-xs">
+              {/* Right: etw badge + status badge + time */}
+              <div className="text-right text-sm shrink-0 ml-3 flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1.5">
+                  {/* ETW 行为计数徽章：有事件时显示 */}
+                  {(ev.etwEvents?.length ?? 0) > 0 && (
+                    <span
+                      className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-[#00d4ff]/10 text-[#00d4ff] border border-[#00d4ff]/25 font-mono"
+                      title={`已捕获 ${ev.etwEvents!.length} 条 ETW 行为事件`}
+                    >
+                      <Zap size={9} />
+                      {ev.etwEvents!.length}
+                    </span>
+                  )}
+                  <span className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeClass(ev.status)}`}>
+                    {ev.status.toUpperCase()}
+                  </span>
+                </div>
+                <p className="text-gray-500 text-xs">
                   {new Date(ev.timestamp).toLocaleTimeString()}
                 </p>
               </div>

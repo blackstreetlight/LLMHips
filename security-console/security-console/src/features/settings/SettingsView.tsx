@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSystemStore } from '../../store/useSystemStore';
-import { Database, BookOpen, Cpu, Cloud, Key, Link, Tag, CheckCircle, XCircle, Loader, SlidersHorizontal } from 'lucide-react';
+import { Database, BookOpen, Cpu, Cloud, Key, Link, Tag, CheckCircle, XCircle, Loader, SlidersHorizontal, Puzzle, ChevronDown, ChevronUp, ShieldAlert, TerminalSquare, AlertTriangle } from 'lucide-react';
+import { SKILLS_META, RISK_COLOR, RISK_LABEL } from '../skills/skillsMeta';
 
 const LLM_URL = (import.meta.env.VITE_LLM_URL as string | undefined) || 'http://localhost:8000';
 
@@ -21,7 +22,11 @@ export const SettingsView: React.FC = () => {
     setEngineConfig,
     inferMaxTokens, inferTemperature, inferTopP, inferMaxHistory,
     setInferParams,
+    skillsEnabled, toggleSkill,
   } = useSystemStore();
+
+  // 技能卡片展开状态（key = skill id）
+  const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
 
   // 本地模型状态检测
   const [localModelStatus, setLocalModelStatus] = useState<LocalModelStatus>('checking');
@@ -400,6 +405,130 @@ export const SettingsView: React.FC = () => {
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ═══════════════ AI 技能管理 ═══════════════ */}
+      <section className="mb-8">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-1">
+          <Puzzle size={15} className="text-[#00d4ff]" />
+          AI 技能管理
+        </h2>
+        <p className="text-xs text-gray-600 mb-4">
+          控制 AI 在分析过程中可调用的技能工具。关闭后 AI 尝试调用时将收到禁用提示，无法执行对应操作。
+        </p>
+
+        <div className="space-y-3">
+          {SKILLS_META.map((skill) => {
+            const enabled  = skillsEnabled[skill.id] ?? true;
+            const expanded = expandedSkill === skill.id;
+
+            return (
+              <div
+                key={skill.id}
+                className={`rounded-lg border transition-all duration-200 overflow-hidden
+                  ${enabled
+                    ? 'border-gray-700 bg-[#161b22]'
+                    : 'border-gray-800 bg-[#0d1117] opacity-60'}`}
+              >
+                {/* 卡片主行 */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  {/* 图标 */}
+                  <div className={`w-8 h-8 rounded flex items-center justify-center shrink-0
+                    ${enabled ? 'bg-[#00d4ff]/10' : 'bg-gray-800'}`}>
+                    <TerminalSquare size={15} className={enabled ? 'text-[#00d4ff]' : 'text-gray-600'} />
+                  </div>
+
+                  {/* 名称 + 描述 */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-sm font-mono font-medium ${enabled ? 'text-gray-200' : 'text-gray-500'}`}>
+                        {skill.displayName}
+                      </span>
+                      <code className="text-[10px] text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">
+                        &lt;{skill.tagName}&gt;
+                      </code>
+                      {/* 风险等级 */}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border font-mono ${RISK_COLOR[skill.riskLevel]}`}>
+                        {RISK_LABEL[skill.riskLevel]}
+                      </span>
+                      {/* 禁用标签 */}
+                      {!enabled && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border text-gray-500 bg-gray-800/50 border-gray-700 font-mono">
+                          已禁用
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">{skill.description}</p>
+                  </div>
+
+                  {/* 展开按钮 */}
+                  <button
+                    onClick={() => setExpandedSkill(expanded ? null : skill.id)}
+                    className="p-1.5 text-gray-600 hover:text-gray-400 transition-colors shrink-0"
+                    title="查看详情"
+                  >
+                    {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </button>
+
+                  {/* Toggle 开关 */}
+                  <button
+                    onClick={() => toggleSkill(skill.id)}
+                    className={`relative w-10 h-5 rounded-full transition-colors shrink-0 focus:outline-none
+                      ${enabled
+                        ? 'bg-[#00d4ff] shadow-[0_0_8px_rgba(0,212,255,0.4)]'
+                        : 'bg-gray-700'}`}
+                    title={enabled ? '点击禁用' : '点击启用'}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200
+                        ${enabled ? 'translate-x-5' : 'translate-x-0'}`}
+                    />
+                  </button>
+                </div>
+
+                {/* 展开详情区 */}
+                {expanded && (
+                  <div className="px-4 pb-4 border-t border-gray-800 pt-3 space-y-3">
+                    {/* 功能详情 */}
+                    <div>
+                      <p className="text-[11px] text-gray-500 mb-1.5 font-mono">功能说明</p>
+                      <ul className="space-y-1">
+                        {skill.details.map((d, i) => (
+                          <li key={i} className="flex items-start gap-2 text-[11px] text-gray-400">
+                            <span className="text-[#00d4ff] mt-0.5 shrink-0">·</span>
+                            {d}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* 禁用行为说明 */}
+                    <div className="flex items-start gap-2 bg-orange-500/5 border border-orange-500/20 rounded px-3 py-2">
+                      <AlertTriangle size={11} className="text-orange-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[11px] text-orange-400 font-mono mb-0.5">禁用后的行为</p>
+                        <p className="text-[11px] text-gray-500">{skill.disabledNote}</p>
+                        <p className="text-[10px] text-gray-600 mt-1 font-mono">
+                          AI 收到：<code className="text-orange-300/70">[SKILL_DISABLED] 技能 "{skill.tagName}" 当前已被用户禁用…</code>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 高风险警告 */}
+                    {skill.riskLevel === 'high' && enabled && (
+                      <div className="flex items-start gap-2 bg-red-500/5 border border-red-500/20 rounded px-3 py-2">
+                        <ShieldAlert size={11} className="text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-red-400/80">
+                          此技能允许 AI 在受控端执行任意命令，请确保仅在可信的分析场景下启用，并监控 AI 的命令调用行为。
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

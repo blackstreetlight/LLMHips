@@ -8,14 +8,24 @@ import {
   User, Lock, LockOpen, HelpCircle, Terminal, GitFork, WifiOff,
 } from 'lucide-react';
 import { BlockSuccessModal } from '../../components/BlockSuccessModal';
+import { buildSystemPrompt } from '../skills/systemPrompt';
+import { streamWithSkills } from '../skills/streamWithSkills';
 
 const LLM_URL = (import.meta.env.VITE_LLM_URL as string | undefined) || 'http://localhost:8000';
 
 interface ChatMessage {
   id: string;
-  role: 'ai' | 'user';
+  /** ai: AI 正常回复  user: 用户消息  skill: 技能调用状态卡片 */
+  role: 'ai' | 'user' | 'skill';
   content: string;
   isStreaming?: boolean;
+  /** role === 'skill' 时有效 */
+  skillInfo?: {
+    name:    string;
+    cmd:     string;
+    status:  'running' | 'done' | 'disabled';
+    result?: string;
+  };
 }
 
 /**
@@ -138,6 +148,9 @@ export const LLMAnalysisView: React.FC = () => {
   //    已被切换/关闭的旧请求不再写入任何 React state，
   //    彻底避免快速切换时的竞态卡死。
   // ─────────────────────────────────────────────────────────
+  // 当前 AI 消息 ID 的可变引用，技能多轮时会在 onNewAITurn 里更新
+  const activeMsgIdRef = useRef('');
+
   const streamFromLLM = async (
     apiMessages: { role: string; content: string }[],
     systemExtra: string,
@@ -146,100 +159,113 @@ export const LLMAnalysisView: React.FC = () => {
     onDone: (fullText: string) => void,
     eventContext?: Record<string, unknown>,
   ) => {
-    // 每次新请求都建一个独立的 AbortController
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+    activeMsgIdRef.current = targetMsgId;
+    setLlmOffline(false);
 
-    try {
-      const resp = await fetch(`${LLM_URL}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          messages: apiMessages,
-          system_extra: systemExtra,
-          event_context: eventContext ?? null,
-          max_new_tokens: inferMaxTokens,
-          temperature: inferTemperature,
-          top_p: inferTopP,
-          engine: buildEnginePayload(enginePreset, engineApiKey, engineBaseUrl, engineModel),
-        }),
-      });
+    await streamWithSkills({
+      url:         LLM_URL,
+      messages:    apiMessages,
+      systemExtra,
+      fetchExtra:  {
+        event_context:  eventContext ?? null,
+        max_new_tokens: inferMaxTokens,
+        temperature:    inferTemperature,
+        top_p:          inferTopP,
+        engine:         buildEnginePayload(enginePreset, engineApiKey, engineBaseUrl, engineModel),
+      },
+      abortRef: abortControllerRef,
+      callbacks: {
+        isActive,
 
-      if (!isActive()) return;   // 请求返回前已被切换 → 丢弃
-      if (!resp.ok)   throw new Error(`服务返回 ${resp.status}`);
-      if (!resp.body) throw new Error('响应体为空');
+        // 追加文本到当前 AI 消息气泡
+        onChunk: (text) => {
+          setMessages(prev => prev.map(m =>
+            m.id === activeMsgIdRef.current
+              ? { ...m, content: m.content + text }
+              : m,
+          ));
+        },
 
-      if (isActive()) setLlmOffline(false);
+        // 技能开始执行：插入"执行中"状态卡片
+        onSkillStart: (skillName, displayCmd) => {
+          const skillMsgId = `skill-${Date.now()}`;
+          // 先把当前 AI 消息标记为非流式（暂停游标）
+          setMessages(prev => [
+            ...prev.map(m =>
+              m.id === activeMsgIdRef.current ? { ...m, isStreaming: false } : m,
+            ),
+            {
+              id:        skillMsgId,
+              role:      'skill' as const,
+              content:   '',
+              skillInfo: { name: skillName, cmd: displayCmd, status: 'running' as const },
+            },
+          ]);
+          activeMsgIdRef.current = skillMsgId; // 临时指向技能卡片
+        },
 
-      const reader  = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let fullText  = '';
-      let buffer    = '';
+        // 技能执行完成：更新卡片状态
+        onSkillResult: (skillName, result) => {
+          const isDisabled = result.startsWith('[SKILL_DISABLED]');
+          setMessages(prev => prev.map(m =>
+            m.role === 'skill' && m.skillInfo?.name === skillName && m.skillInfo?.status === 'running'
+              ? {
+                  ...m,
+                  skillInfo: {
+                    ...m.skillInfo!,
+                    status: isDisabled ? 'disabled' as const : 'done' as const,
+                    result: isDisabled ? '技能已禁用' : result,
+                  },
+                }
+              : m,
+          ));
+        },
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!isActive()) { reader.cancel(); return; }  // 读取中被切换 → 中止
+        // 技能完成后：新建 AI 消息气泡，供后续回复写入
+        onNewAITurn: () => {
+          const newId = `ai-skill-turn-${Date.now()}`;
+          activeMsgIdRef.current = newId;
+          setMessages(prev => [
+            ...prev,
+            { id: newId, role: 'ai' as const, content: '', isStreaming: true },
+          ]);
+        },
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+        // 全部轮次完成
+        onDone: (fullText) => {
+          setMessages(prev => {
+            const updated = prev.map(m =>
+              m.id === activeMsgIdRef.current
+                ? { ...m, isStreaming: false }
+                : m,
+            );
+            syncChatToStore(updated);
+            return updated;
+          });
+          setShowActions(true);
+          if (isActive()) setIsAiThinking(false);
+          onDone(fullText);
+        },
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6).trim();
-          if (payload === '[DONE]') break;
-          try {
-            const { text, error } = JSON.parse(payload) as { text?: string; error?: string };
-            if (error) throw new Error(error);
-            if (text && isActive()) {
-              fullText += text;
-              setMessages(prev => prev.map(m =>
-                m.id === targetMsgId ? { ...m, content: fullText } : m,
-              ));
-            }
-          } catch { /* 跳过格式错误帧 */ }
-        }
-      }
-
-      if (!isActive()) return;
-
-      // 流结束 → 标记完成、持久化
-      setMessages(prev => {
-        const updated = prev.map(m =>
-          m.id === targetMsgId ? { ...m, content: fullText, isStreaming: false } : m,
-        );
-        syncChatToStore(updated);
-        return updated;
-      });
-      setShowActions(true);
-      onDone(fullText);
-
-    } catch (err: unknown) {
-      if (!isActive()) return;                          // 已切换，忽略所有错误
-      if (err instanceof Error && err.name === 'AbortError') return;
-
-      const errMsg  = err instanceof Error ? err.message : '未知错误';
-      const fallback = `⚠️ 无法连接到本地推理服务（${LLM_URL}）\n错误：${errMsg}\n\n请确认已运行：\ncd LLM/QwenLLM/Web && python server.py`;
-      setLlmOffline(true);
-      setMessages(prev => {
-        const updated = prev.map(m =>
-          m.id === targetMsgId ? { ...m, content: fallback, isStreaming: false } : m,
-        );
-        syncChatToStore(updated);
-        return updated;
-      });
-      setShowActions(true);
-      onDone(fallback);
-
-    } finally {
-      // 只有本次会话仍然有效时才清除 thinking 状态
-      // 避免旧请求的 finally 把新会话的 loading 状态意外重置
-      if (isActive()) {
-        setIsAiThinking(false);
-      }
-    }
+        // 错误处理
+        onError: (errMsg) => {
+          if (!isActive()) return;
+          setLlmOffline(true);
+          setMessages(prev => {
+            const updated = prev.map(m =>
+              m.id === activeMsgIdRef.current
+                ? { ...m, content: errMsg, isStreaming: false }
+                : m,
+            );
+            syncChatToStore(updated);
+            return updated;
+          });
+          setShowActions(true);
+          if (isActive()) setIsAiThinking(false);
+          onDone(errMsg);
+        },
+      },
+    });
   };
 
   // ─────────────────────────────────────────────────────────
@@ -251,7 +277,8 @@ export const LLMAnalysisView: React.FC = () => {
     const signedText = ev.isSigned === 2 ? '已签名（Authenticode 验证通过）'
                      : ev.isSigned === 1 ? '未签名（缺少数字签名）'
                      : '签名状态未知';
-    return [
+
+    const baseContext = [
       `进程名: ${ev.processName} (PID: ${ev.pid})`,
       `进程路径: ${ev.processPath}`,
       `命令行参数: ${ev.cmdLine || '（无参数）'}`,
@@ -264,7 +291,47 @@ export const LLMAnalysisView: React.FC = () => {
       ev.fileCreateTime > 0
         ? `文件创建时间: ${new Date(ev.fileCreateTime).toLocaleString('zh-CN')}`
         : '',
-    ].filter(Boolean).join('\n');
+    ].filter(Boolean);
+
+    // ── 注入 ETW 行为链（全量，时间升序） ──
+    // 直接从 ProcessEvent.etwEvents 取，无需 PID 查表
+    // 格式分两层：① 统计摘要（让 AI 快速掌握全貌）② 逐条明细（高危完整展示，其余紧凑单行）
+    const pidEtwEvents = ev.etwEvents ?? [];
+    if (pidEtwEvents.length > 0) {
+      // ── ① 统计摘要 ──
+      const countByCategory = { File: 0, Registry: 0, Network: 0 } as Record<string, number>;
+      const countBySeverity = { high: 0, medium: 0, low: 0 } as Record<string, number>;
+      for (const e of pidEtwEvents) {
+        countByCategory[e.category] = (countByCategory[e.category] ?? 0) + 1;
+        countBySeverity[e.severity] = (countBySeverity[e.severity] ?? 0) + 1;
+      }
+      baseContext.push('');
+      baseContext.push(
+        `运行时 ETW 行为链（共 ${pidEtwEvents.length} 条）` +
+        ` | 文件:${countByCategory.File} 注册表:${countByCategory.Registry} 网络:${countByCategory.Network}` +
+        ` | 高危:${countBySeverity.high} 中危:${countBySeverity.medium} 低危:${countBySeverity.low}`,
+      );
+
+      // ── ② 逐条明细（时间升序） ──
+      pidEtwEvents.forEach((e, i) => {
+        const t = new Date(e.timestamp).toLocaleTimeString('zh-CN', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+        });
+        if (e.severity === 'high') {
+          // 高危：完整展示（含规则描述）
+          baseContext.push(
+            `  ${i + 1}. [${t}][⚠高危] ${e.category}.${e.action} → ${e.target}` +
+            (e.ruleDescription ? ` // ${e.ruleDescription}` : ''),
+          );
+        } else {
+          // 中/低危：紧凑单行，不输出规则描述以节省 token
+          const sev = e.severity === 'medium' ? '[中]' : '';
+          baseContext.push(`  ${i + 1}. [${t}]${sev} ${e.category}.${e.action} → ${e.target}`);
+        }
+      });
+    }
+
+    return baseContext.join('\n');
   };
 
   // ─────────────────────────────────────────────────────────
@@ -306,7 +373,7 @@ export const LLMAnalysisView: React.FC = () => {
 
     streamFromLLM(
       [{ role: 'user', content: initPrompt }],
-      buildEventContext(),
+      buildSystemPrompt({ skills: ['terminal'], contextBlock: buildEventContext() }),
       initialMsgId,
       isActive,
       (fullText) => {
@@ -349,7 +416,10 @@ export const LLMAnalysisView: React.FC = () => {
       active = false;
       abortControllerRef.current?.abort();
     };
-  }, [selectedEvent]);
+  // 只依赖事件 ID：ETW 行为链更新会创建新的 selectedEvent 对象引用，
+  // 但不应重启整轮分析；只有用户切换到不同进程事件时才重新分析。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEvent?.id]);
 
   // 自动滚动
   useEffect(() => {
@@ -414,7 +484,8 @@ export const LLMAnalysisView: React.FC = () => {
 
     // 构造历史对话记录成为新对话的上下文
     // inferMaxHistory=0 表示保留全部，否则取最近 N 轮（每轮 = 1 user + 1 ai，共 2 条消息）
-    const historyMessages = snapshotHistory.filter(m => !m.isStreaming && m.content);
+    // skill 类型消息是 UI 技能卡片，不传给 API；转换 role 时也过滤掉
+    const historyMessages = snapshotHistory.filter(m => !m.isStreaming && m.content && m.role !== 'skill');
     const trimmed = inferMaxHistory > 0
       ? historyMessages.slice(-inferMaxHistory * 2)
       : historyMessages;
@@ -428,7 +499,13 @@ export const LLMAnalysisView: React.FC = () => {
 
     // 追问没有 effect cleanup，用 active=true 保持活跃（不会被切换中断）
     let active = true;
-    streamFromLLM(apiMessages, buildEventContext(), aiMsgId, () => active, () => {});
+    streamFromLLM(
+      apiMessages,
+      buildSystemPrompt({ skills: ['terminal'], contextBlock: buildEventContext() }),
+      aiMsgId,
+      () => active,
+      () => {},
+    );
   };
 
   if (!selectedEvent) return null;
@@ -566,7 +643,50 @@ export const LLMAnalysisView: React.FC = () => {
             </span>
           </div>
 
-          {messages.map(msg => (
+          {messages.map(msg => {
+            // ── 技能调用状态卡片 ──────────────────────────────────
+            if (msg.role === 'skill' && msg.skillInfo) {
+              const { name, cmd, status, result } = msg.skillInfo;
+              const isRunning  = status === 'running';
+              const isDisabled = status === 'disabled';
+              return (
+                <div key={msg.id} className="flex justify-start">
+                  <div className={`w-full max-w-[88%] rounded-lg border text-xs font-mono overflow-hidden
+                    ${isDisabled
+                      ? 'bg-gray-800/40 border-gray-700'
+                      : isRunning
+                      ? 'bg-[#00d4ff]/5 border-[#00d4ff]/20'
+                      : 'bg-green-500/5 border-green-500/20'}`}
+                  >
+                    {/* 头部：技能名 + 状态 */}
+                    <div className={`flex items-center gap-2 px-3 py-2 border-b
+                      ${isDisabled ? 'border-gray-700' : isRunning ? 'border-[#00d4ff]/15' : 'border-green-500/15'}`}>
+                      <Terminal size={11} className={isDisabled ? 'text-gray-600' : isRunning ? 'text-[#00d4ff]' : 'text-green-400'} />
+                      <span className={isDisabled ? 'text-gray-500' : isRunning ? 'text-[#00d4ff]' : 'text-green-400'}>
+                        {name}
+                      </span>
+                      <span className="text-gray-600">·</span>
+                      {isRunning  && <span className="text-[#00d4ff] animate-pulse">执行中…</span>}
+                      {!isRunning && !isDisabled && <span className="text-green-400">✓ 执行完成</span>}
+                      {isDisabled && <span className="text-gray-500">⊘ 已禁用</span>}
+                    </div>
+                    {/* 命令 */}
+                    <div className="px-3 py-1.5 text-gray-500">
+                      <span className="text-gray-700">$ </span>{cmd}
+                    </div>
+                    {/* 结果（执行完成后显示） */}
+                    {result && !isDisabled && (
+                      <div className="px-3 py-2 border-t border-green-500/10 text-gray-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                        {result.length > 500 ? result.slice(0, 500) + '\n…（输出已截断）' : result}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            // ── 普通消息气泡 ──────────────────────────────────────
+            return (
             <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {msg.role === 'ai' && (
                 <div className="w-8 h-8 rounded-full bg-[#00d4ff]/10 border border-[#00d4ff]/30 flex items-center justify-center shrink-0">
@@ -639,7 +759,8 @@ export const LLMAnalysisView: React.FC = () => {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
 
           {isAiThinking && messages.every(m => !m.content) && (
             <div className="flex gap-4 justify-start">
