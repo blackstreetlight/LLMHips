@@ -70,3 +70,9 @@ WorkMemory/
 
 # ── 运行时数据库（案例库，运行时自动生成）────────────────────────────────────
 LLM/QwenLLM/FewShot/case_library.db
+
+# ── 说明/笔记文档（非 README，本地保留，不上传）──────────────────────────────
+# 规则：忽略所有 .md，但明确排除各层 README 文件
+DriverLayer/*.md
+DriverServer/*.md
+!DriverServer/SecurityBridge/README.md
