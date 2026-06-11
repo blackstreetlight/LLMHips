@@ -73,6 +73,7 @@ LLM/QwenLLM/FewShot/case_library.db
 
 # ── 早期实验驱动（已被 ZDriverHips 取代，本地保留）──────────────────────────
 DriverLayer/ProcessHips/
+ProcessHips/
 
 # ── 说明/笔记文档（非 README，本地保留，不上传）──────────────────────────────
 # 规则：忽略所有 .md，但明确排除各层 README 文件
